@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Crop Quiz · Real or Synthetic</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><a class="brand" href="/">◐ <span>Crop Quiz</span></a><span class="subtitle">РЕАЛЬНОЕ ИЛИ СИНТЕТИКА?</span><button id="export">Экспорт результатов</button></header>
+<main>
+<section class="workspace">
+<div class="heading"><div><p class="eyebrow">СЛЕПОЕ СРАВНЕНИЕ</p><h1>Попробуй отличить</h1><p class="muted">Случайный кроп. Одинаковые контраст и масштаб для обоих источников.</p></div><span id="trialLabel" class="badge">Подготовка…</span></div>
+<div id="error" role="alert" hidden></div>
+<div class="stage" id="stage"><img id="crop" alt="Случайный кроп для определения источника" hidden><span id="empty">Загрузка…</span></div>
+<div class="view"><label>Масштаб <select id="zoom"><option value="1">1×</option><option value="2">2×</option><option value="4" selected>4×</option><option value="fit">Вписать</option></select></label><span id="sizeLabel">—</span><button id="skip">Пропустить</button></div>
+<div class="answers"><button id="real" disabled><kbd>1</kbd> Реальные данные</button><button id="synthetic" disabled><kbd>2</kbd> Синтетика</button></div>
+<div class="feedback" id="feedback" aria-live="polite"><span id="feedbackText">Сначала посмотри на кроп, затем выбери источник.</span><small id="reveal"></small></div>
+<button class="next" id="next" disabled>Следующий кроп <kbd>Enter</kbd></button>
+</section>
+<aside>
+<p class="eyebrow">ВЫБОРКА</p><form id="settings"><div class="dimensions"><label>Ширина, px<input id="width" type="number" min="8" step="1" value="96" required></label><span>×</span><label>Высота, px<input id="height" type="number" min="8" step="1" value="96" required></label></div>
+<div class="presets"><button type="button" data-size="64">64²</button><button type="button" data-size="96">96²</button><button type="button" data-size="128">128²</button><button type="button" data-size="160">160²</button></div>
+<label class="check"><input id="strict" type="checkbox" checked><span>Только кропы без пикселей маски исключения</span></label><p class="muted">Кроп целиком лежит вне размеченных областей без нейронов. Одинаковое ограничение для реальных и синтетических данных.</p><label class="contrast-control">Контраст<select id="contrast"><option value="fixed">Общая шкала ADU</option><option value="normalized">Нормировать каждый кроп: P5–P95</option></select></label><p class="muted">Нормировка — диагностический режим: убирает абсолютную яркость и диапазон как подсказки. Применяется одинаково к обоим источникам.</p><button id="apply" type="submit">Применить и показать новый</button></form>
+<div class="stats"><p class="eyebrow">РЕЗУЛЬТАТЫ ЭТОЙ СЕССИИ</p><div class="score"><strong id="accuracy">—</strong><span>правильных ответов</span></div><p id="count">0 ответов</p><div class="class-stat"><span>Реальные</span><b id="realStat">0 / 0</b></div><div class="class-stat"><span>Синтетика</span><b id="syntheticStat">0 / 0</b></div><div class="class-stat"><span>Общая шкала</span><b id="fixedStat">0 / 0</b></div><div class="class-stat"><span>Нормированный контраст</span><b id="normalizedStat">0 / 0</b></div><p class="muted">Вероятность каждого источника — 50%. Пропуски не учитываются. Размеры могут меняться; экспорт содержит параметры каждого ответа.</p></div>
+<details><summary>Источники и управление</summary><p id="sources" class="muted">Загрузка…</p><p class="muted">1 — реальные, 2 — синтетика. Enter — следующий после ответа. Изображение показано в прежней ориентации: горизонталь Y, вертикаль X.</p><p class="muted">Общая шкала ADU сохраняет абсолютные яркости. Режим P5–P95 нормирует каждый кроп отдельно. Изменение масштаба одинаково для обоих источников. Метка раскрывается после ответа.</p></details>
+<div class="save"><span id="saved">Ответы сохраняются локально</span><small id="sessionFile"></small></div>
+</aside>
+</main><footer><span id="status" role="status">Подготовка сессии…</span><span>Локально · данные не покидают компьютер</span></footer><script src="app.js" type="module"></script>
+</body></html>

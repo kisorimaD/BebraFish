@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Soma Review · Plane20</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header>
+    <div><h1>Soma Review</h1><p id="source">Загрузка кадра…</p></div>
+    <div class="header-actions">
+      <span id="save-state" role="status" aria-live="polite">Загрузка…</span>
+      <a id="download" href="/api/export" download hidden>Экспорт JSON</a>
+    </div>
+  </header>
+  <div id="error" role="alert" hidden></div>
+  <main id="review" hidden>
+    <section class="workspace" aria-label="Кропы">
+      <div class="toolbar">
+        <span id="coordinates" class="mono"></span>
+        <label>Поле <select id="field">
+          <option value="24">24 px</option><option value="40" selected>40 px</option><option value="64">64 px</option>
+        </select></label>
+        <label>Контраст <select id="contrast">
+          <option value="local" selected>Локальный</option><option value="global">Весь кадр</option>
+        </select></label>
+      </div>
+      <div class="views">
+        <figure><figcaption id="original">Исходный кадр</figcaption><canvas id="raw" aria-label="Кроп без маски"></canvas></figure>
+        <figure><figcaption>Маска модели</figcaption><canvas id="overlay" aria-label="Маска на исходном кропе"></canvas></figure>
+      </div>
+      <div class="overview-title">
+        <span>Весь кадр</span><span>Клик по кадру открывает ближайшее предложение</span>
+      </div>
+      <canvas id="overview" aria-label="Карта предложений"></canvas>
+    </section>
+    <aside aria-label="Решение о маске">
+      <label id="model-filter-control" class="model filter" hidden>Проверять <select id="model-filter"></select></label>
+      <div class="progress">
+        <div><strong id="accepted">0</strong><span>Принято</span></div>
+        <div><strong id="rejected">0</strong><span id="rejected-label">Отклонено</span></div>
+        <div id="bad-progress" hidden><strong id="bad-count">0</strong><span>Плохая маска</span></div>
+        <div id="uncertain-progress" hidden><strong id="uncertain-count">0</strong><span>Неясно</span></div>
+        <div><strong id="remaining">0</strong><span>Без решения</span></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2 id="current-id"></h2><span id="current-state"></span></div>
+        <p id="prior" hidden>Рядом есть контур из прежней ручной разметки.</p>
+        <label class="model">Маска <select id="model"></select></label>
+        <div id="details" class="mono"></div>
+        <p class="prompt" id="prompt">Маска охватывает всю сому с тёмным центром, а граница идёт примерно по середине светящейся оболочки?</p>
+        <div class="decisions">
+          <button id="yes" class="yes" type="button">Да <kbd>Y</kbd></button>
+          <button id="no" class="no" type="button"><span id="no-label">Нет</span> <kbd>N</kbd></button>
+          <button id="bad-mask" type="button" hidden title="Сома есть, маска не подходит">Плохая маска <kbd>M</kbd></button>
+          <button id="uncertain" type="button" hidden title="Нельзя уверенно решить по этому кропу">Неясно <kbd>U</kbd></button>
+        </div>
+        <button id="clear" class="quiet" type="button" hidden>Сбросить решение</button>
+      </div>
+      <div class="navigation">
+        <button id="previous" type="button" aria-label="Предыдущее предложение">←</button>
+        <span id="position"></span>
+        <button id="next" type="button" aria-label="Следующее предложение">→</button>
+        <button id="pending" type="button">Без решения</button>
+      </div>
+      <p class="hint">Стрелки листают очередь. Можно пропустить карточку и вернуться к ней позже.</p>
+    </aside>
+  </main>
+</body>
+</html>

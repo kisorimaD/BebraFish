@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 import sys
 import numpy as np
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, binary_fill_holes
 
 sys.path.insert(0,str(Path(__file__).resolve().parent/'vendor/SimCalc'))
 from simcalc import SimCalc
@@ -45,6 +45,9 @@ def _build_scene(p, seed, *, centres=None, tissue=None, emission_gain=None, surf
     if count >= 65535:
         raise ValueError('Too many cells for uint16 labels; reduce density')
     rng = np.random.default_rng(seed)
+    center_fill=float(p.get('ring_center_fill',0.))
+    if not np.isfinite(center_fill) or not 0<=center_fill<=1:
+        raise ValueError('ring_center_fill must be within [0,1]')
     if centres is None:
         centres = uniform_centres((height, width), count, p['min_spacing_px'], rng)
     sigma = p['sigma_px'] * np.clip(rng.lognormal(-p['size_cv']**2/2, p['size_cv'], count), .45, 2.)
@@ -58,6 +61,7 @@ def _build_scene(p, seed, *, centres=None, tissue=None, emission_gain=None, surf
     signal = np.zeros((height, width), dtype=np.float32)
     strength = np.zeros_like(signal)
     labels = np.zeros((height, width), dtype=np.uint16)
+    footprints=[];footprint_offsets=[0]
     square_side = max(height, width)
     for index, (centre, size, cov, amplitude, ring) in enumerate(
             zip(centres, sigma, covariance, amplitudes, rings)):
@@ -67,12 +71,20 @@ def _build_scene(p, seed, *, centres=None, tissue=None, emission_gain=None, surf
         model = SimCalc(h=side, N=1, T=1, StimCycles=1, dt=1)
         model.gen_spat_kernels(locs=(centre-origin)[None], sizes=np.array([size**2]),
                                covs=np.array([cov]), use_rings=bool(ring))
+        spatial_kernel=model.spat_kernels[0]
+        if ring and center_fill>0:
+            solid=SimCalc(h=side,N=1,T=1,StimCycles=1,dt=1)
+            solid.gen_spat_kernels(locs=(centre-origin)[None],sizes=np.array([size**2]),
+                                   covs=np.array([cov]),use_rings=False)
+            # Fluorescence mixture only. The whole-soma footprint remains
+            # geometric and is not re-thresholded after filling its center.
+            spatial_kernel=(1-center_fill)*spatial_kernel+center_fill*solid.spat_kernels[0]
         # Match native square SimCalc's reflected optical boundary, then
         # crop the rectangular FOV. Do not blur through the square boundary.
         square_origin = np.maximum(origin, 0)
         square_end = np.minimum(origin + side, square_side)
         square_local = tuple(slice(a-o, b-o) for a, b, o in zip(square_origin, square_end, origin))
-        kernel = gaussian_filter(model.spat_kernels[0][square_local], p['blur_px'])
+        kernel = gaussian_filter(spatial_kernel[square_local], p['blur_px'])
         y0, x0 = np.maximum(origin, 0)
         y1, x1 = np.minimum(origin + side, (height, width))
         local = (slice(y0-origin[0], y1-origin[0]), slice(x0-origin[1], x1-origin[1]))
@@ -80,14 +92,28 @@ def _build_scene(p, seed, *, centres=None, tissue=None, emission_gain=None, surf
         blurred_local = (slice(y0-square_origin[0], y1-square_origin[0]),
                          slice(x0-square_origin[1], x1-square_origin[1]))
         intensity = (kernel[blurred_local] * amplitude).astype(np.float32)
-        mask = model.masks[0][local]
+        footprint = model.masks[0]
+        if p.get('fill_soma_masks', False):
+            # Fill the complete kernel before cropping, so a nucleus cut by
+            # the FOV boundary does not become an artificial open hole.
+            footprint = binary_fill_holes(footprint)
+        mask = footprint[local]
         if tissue is not None:
             intensity *= tissue[target]
             mask = mask & (tissue[target] >= .5)
+        if p.get('keep_instance_footprints',False):
+            my,mx=np.nonzero(mask)
+            pixels=((my+y0)*width+mx+x0).astype(np.uint32)
+            footprints.append(pixels)
+            footprint_offsets.append(footprint_offsets[-1]+len(pixels))
         if emission_gain is not None:
             intensity *= emission_gain[target]
         signal[target] += intensity
         replace = mask & (intensity > strength[target])
+        if p.get('fill_soma_masks',False):
+            # Whole-soma GT includes a perfectly dark nucleus as well. An
+            # unowned mask pixel must not disappear because its intensity is 0.
+            replace = mask & ((labels[target]==0)|(intensity>strength[target]))
         strength[target][replace] = intensity[replace]
         labels[target][replace] = index + 1
     side = max(height, width)
@@ -101,12 +127,16 @@ def _build_scene(p, seed, *, centres=None, tissue=None, emission_gain=None, surf
         neuropil[:height, :width] *= emission_gain
     if surface is not None:
         signal += surface
-    return {'signal': signal, 'background_square': neuropil,
+    result = {'signal': signal, 'background_square': neuropil,
             'latent_fluorescence': (signal + neuropil[:height, :width]).astype(np.float32),
             'labels': labels, 'centres_yx': centres, 'sigma_px': sigma.astype(np.float32),
             'covariances': covariance.astype(np.float32),
             'amplitudes': amplitudes.astype(np.float32), 'rings': rings,
             'neuron_count': count}
+    if p.get('keep_instance_footprints',False):
+        result['instance_offsets']=np.asarray(footprint_offsets,dtype=np.uint32)
+        result['instance_pixel_index']=np.concatenate(footprints) if footprints else np.empty(0,dtype=np.uint32)
+    return result
 
 def sample_head_centres(support, count, spacing, rng, density_weights=None):
     eligible = np.argwhere(support)

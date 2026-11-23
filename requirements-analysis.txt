@@ -1,0 +1,5 @@
+# Optional movie diagnostics and GIF export
+-r requirements.txt
+scikit-image>=0.22
+Pillow>=10
+threadpoolctl>=3.1

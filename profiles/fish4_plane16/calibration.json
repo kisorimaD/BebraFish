@@ -1,0 +1,361 @@
+{
+  "format": "plane16-simcalc-adu-fit-v2",
+  "selected": {
+    "sigma_px": 3.214579315651832,
+    "size_cv": 0.1,
+    "amplitude_cv": 0.2144767984413944,
+    "eccentricity": 0.08,
+    "blur_px": 0.6,
+    "ring_fraction": 0.5,
+    "cell_count": 2419,
+    "cell_contrast_std_adu": 13.793068730605563,
+    "shot_gain_adu": 3.0254396499315503,
+    "read_variance_adu2": 45.81002993282897,
+    "excess_variance_fraction": 0.013649495389142436,
+    "gt_mode": "soma",
+    "ring_center_fill": 0.25,
+    "contrast_scale": 1.0
+  },
+  "selected_by": "fish4 train photometry and noise fit; user-fixed E cell count and 20% smaller round morphology",
+  "source_recording": {
+    "path": "/mnt/fish2/20260520_Soma_GCaMP8f_fish4/tiff_file/Plane16.tiff",
+    "bytes": 17919792016,
+    "mtime_ns": 1779449390000000000,
+    "header_sha256": "4a06e49d8115a50835d6c3acc68d3afc847da7d4577de776a900dd384fa13773",
+    "identity_kind": "stat+header, not full-file hash",
+    "frame_count": 18000,
+    "raw_shape_yx": [
+      288,
+      1728
+    ],
+    "shape_yx": [
+      1728,
+      288
+    ],
+    "transpose": true,
+    "page_stride_bytes": 995544
+  },
+  "pixel_size_um": 0.576,
+  "parent_calibration_sha256": "8cc2bfe39394fd74405829cc7d5139de87c48f184d8d6e7b3d4a083f87612232",
+  "template_sha256": "1d4c94dc185b8762e2e8ad440ea31f3c15f2d49c67531b959a89166600021ace",
+  "profile_sha256": "d32b4d496e08351cbdfde06a7fd233df8bb48adbcbef00f2f150dad069ce8fdb",
+  "source_code_sha256": {
+    "adapt_fish4.py": "b8a185064473fcfa0897b67ff89f073cc2cd5876a845a212de3fa446b626deed",
+    "calibrated_simcalc.py": "65278ae2ddfb568142ca1f0c45481ffda68e829a57b99237c8bb8578fdd45830",
+    "simcalc_core.py": "a797263c8a76048cedd61277898c991582e718e4bdf93ed499245ef09c0e2733"
+  },
+  "detector": {
+    "shot_gain_adu": 3.0254396499315503,
+    "read_variance_adu2": 45.81002993282897,
+    "effective_read_sd_adu": 6.7683107148555886,
+    "intensity_bins_adu": [
+      0.0,
+      5.083335876464844,
+      17.041656494140625,
+      29.135421752929688,
+      38.13542175292969,
+      46.86457824707031,
+      55.78125,
+      66.14582824707031,
+      79.21875,
+      98.59375,
+      129.125,
+      180.57293701171875
+    ],
+    "variance_bins_adu2": [
+      45.81002993282897,
+      75.46042092799843,
+      111.23537824437584,
+      149.8199074697152,
+      178.10429886436532,
+      206.77804645132073,
+      234.2552896737717,
+      273.1351882296818,
+      339.0989029447677,
+      496.5739023454704,
+      743.341320516486,
+      1004.0932107506994
+    ],
+    "fit_r2": 0.9883583137064855,
+    "spatial_highpass_sigma_px": 1.2,
+    "excess_variance_fraction": 0.013649495389142436,
+    "high_signal_relative_residual": 0.03785489705893407,
+    "train_burst_source_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      3417,
+      3418,
+      3419,
+      3420,
+      3421,
+      3422,
+      3423,
+      3424,
+      3425,
+      3426,
+      3427,
+      3428,
+      3429,
+      3430,
+      3431,
+      3432,
+      3433,
+      3434,
+      3435,
+      3436,
+      3437,
+      3438,
+      3439,
+      3440,
+      6907,
+      6908,
+      6909,
+      6910,
+      6911,
+      6912,
+      6913,
+      6914,
+      6915,
+      6916,
+      6917,
+      6918,
+      6919,
+      6920,
+      6921,
+      6922,
+      6923,
+      6924,
+      6925,
+      6926,
+      6927,
+      6928,
+      6929,
+      6930,
+      12453,
+      12454,
+      12455,
+      12456,
+      12457,
+      12458,
+      12459,
+      12460,
+      12461,
+      12462,
+      12463,
+      12464,
+      12465,
+      12466,
+      12467,
+      12468,
+      12469,
+      12470,
+      12471,
+      12472,
+      12473,
+      12474,
+      12475,
+      12476
+    ],
+    "meaning": "Effective Poisson-Gaussian model; calcium/motion may inflate temporal variance; not electron calibration"
+  },
+  "morphology_adjustment": {
+    "parent_sigma_px": 4.0182241445647895,
+    "size_multiplier": 0.8,
+    "meaning": "20% smaller linear kernel scale; fixed 0.6px optical blur, not exactly 20% smaller observed FWHM"
+  },
+  "structure_method": {
+    "train_bursts": [
+      {
+        "source_indices": [
+          1440,
+          1503
+        ],
+        "translation_yx": [
+          0.0,
+          0.0
+        ],
+        "burst_translation_range_yx": [
+          0.17304444105165884,
+          0.13041593430191184
+        ]
+      },
+      {
+        "source_indices": [
+          5400,
+          5463
+        ],
+        "translation_yx": [
+          0.012862657706075021,
+          0.005649883053024664
+        ],
+        "burst_translation_range_yx": [
+          0.19285912635503713,
+          0.18618432776424498
+        ]
+      },
+      {
+        "source_indices": [
+          11700,
+          11763
+        ],
+        "translation_yx": [
+          -0.003500154436776572,
+          0.005585392016123777
+        ],
+        "burst_translation_range_yx": [
+          0.14981757786893363,
+          0.1417807364535673
+        ]
+      }
+    ],
+    "density_sigma_px": 8.0,
+    "diffuse_sigma_px": 12.0,
+    "density_exponent": 1.8
+  },
+  "train_loss": 0.05893944220272619,
+  "contrast_candidates": [
+    {
+      "settings": {
+        "sigma_px": 3.214579315651832,
+        "size_cv": 0.1,
+        "amplitude_cv": 0.2144767984413944,
+        "eccentricity": 0.08,
+        "blur_px": 0.6,
+        "ring_fraction": 0.5,
+        "cell_count": 2419,
+        "cell_contrast_std_adu": 13.793068730605563,
+        "shot_gain_adu": 3.0254396499315503,
+        "read_variance_adu2": 45.81002993282897,
+        "excess_variance_fraction": 0.013649495389142436,
+        "gt_mode": "soma",
+        "ring_center_fill": 0.25,
+        "contrast_scale": 0.6
+      },
+      "train_loss": 0.25715011535022725
+    },
+    {
+      "settings": {
+        "sigma_px": 3.214579315651832,
+        "size_cv": 0.1,
+        "amplitude_cv": 0.2144767984413944,
+        "eccentricity": 0.08,
+        "blur_px": 0.6,
+        "ring_fraction": 0.5,
+        "cell_count": 2419,
+        "cell_contrast_std_adu": 13.793068730605563,
+        "shot_gain_adu": 3.0254396499315503,
+        "read_variance_adu2": 45.81002993282897,
+        "excess_variance_fraction": 0.013649495389142436,
+        "gt_mode": "soma",
+        "ring_center_fill": 0.25,
+        "contrast_scale": 0.8
+      },
+      "train_loss": 0.15040057038521804
+    },
+    {
+      "settings": {
+        "sigma_px": 3.214579315651832,
+        "size_cv": 0.1,
+        "amplitude_cv": 0.2144767984413944,
+        "eccentricity": 0.08,
+        "blur_px": 0.6,
+        "ring_fraction": 0.5,
+        "cell_count": 2419,
+        "cell_contrast_std_adu": 13.793068730605563,
+        "shot_gain_adu": 3.0254396499315503,
+        "read_variance_adu2": 45.81002993282897,
+        "excess_variance_fraction": 0.013649495389142436,
+        "gt_mode": "soma",
+        "ring_center_fill": 0.25,
+        "contrast_scale": 1.0
+      },
+      "train_loss": 0.05893944220272619
+    },
+    {
+      "settings": {
+        "sigma_px": 3.214579315651832,
+        "size_cv": 0.1,
+        "amplitude_cv": 0.2144767984413944,
+        "eccentricity": 0.08,
+        "blur_px": 0.6,
+        "ring_fraction": 0.5,
+        "cell_count": 2419,
+        "cell_contrast_std_adu": 13.793068730605563,
+        "shot_gain_adu": 3.0254396499315503,
+        "read_variance_adu2": 45.81002993282897,
+        "excess_variance_fraction": 0.013649495389142436,
+        "gt_mode": "soma",
+        "ring_center_fill": 0.25,
+        "contrast_scale": 1.2
+      },
+      "train_loss": 0.1102621646264956
+    },
+    {
+      "settings": {
+        "sigma_px": 3.214579315651832,
+        "size_cv": 0.1,
+        "amplitude_cv": 0.2144767984413944,
+        "eccentricity": 0.08,
+        "blur_px": 0.6,
+        "ring_fraction": 0.5,
+        "cell_count": 2419,
+        "cell_contrast_std_adu": 13.793068730605563,
+        "shot_gain_adu": 3.0254396499315503,
+        "read_variance_adu2": 45.81002993282897,
+        "excess_variance_fraction": 0.013649495389142436,
+        "gt_mode": "soma",
+        "ring_center_fill": 0.25,
+        "contrast_scale": 1.4
+      },
+      "train_loss": 0.19574056057463154
+    }
+  ],
+  "diagnostics": {
+    "validation": {
+      "mean_log_feature_error": 0.05787335985551773,
+      "source_indices": [
+        7328,
+        8074,
+        8871
+      ]
+    },
+    "test": {
+      "mean_log_feature_error": 0.058281093559581575,
+      "source_indices": [
+        14528,
+        15274,
+        16071
+      ]
+    }
+  },
+  "review_required": true,
+  "limitations": [
+    "2419 neurons is inherited visual E choice, not identified fish4 count",
+    "Fluorescence-informed coarse density is a spatial prior, not measured neuron density",
+    "Effective detector variance may include calcium or movement",
+    "Whole-soma synthetic GT retains overlaps in sparse footprints; raster has one owner per pixel",
+    "Temporal holdouts of one plane; summary statistics do not prove biological realism"
+  ]
+}

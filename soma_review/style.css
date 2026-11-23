@@ -1,0 +1,72 @@
+:root {
+  color-scheme: dark;
+  --background: #101418;
+  --panel: #181e24;
+  --line: #333d46;
+  --muted: #aab7c3;
+  --text: #edf3f7;
+  --accent: #8ee5cf;
+  --reject: #f3a5a1;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--background); color: var(--text); font: 14px/1.5 system-ui, sans-serif; }
+header, main { max-width: 1400px; margin: auto; padding-inline: 28px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 19px; }
+h1, h2, p, figure { margin: 0; }
+h1 { font-size: 25px; font-weight: 650; letter-spacing: -.65px; }
+header p, .hint, .overview-title, .toolbar label, .model, .mono { color: var(--muted); }
+.header-actions { display: flex; gap: 14px; align-items: center; }
+#save-state { color: var(--accent); }
+#save-state[data-error] { color: var(--reject); }
+#error { padding: 12px 28px; background: #542b2b; color: #ffe4e2; }
+a, button, select { font: inherit; }
+a, button, select { border: 1px solid var(--line); border-radius: 6px; background: #222b33; color: var(--text); padding: 7px 11px; }
+a { text-decoration: none; white-space: nowrap; }
+button, select, a { cursor: pointer; }
+button:hover, a:hover { border-color: var(--muted); }
+button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled, select:disabled { opacity: .45; cursor: default; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 305px; gap: 22px; padding-bottom: 28px; }
+.workspace, aside { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.toolbar, .overview-title { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.toolbar { margin-bottom: 10px; }
+.mono { font: 12px/1.5 ui-monospace, monospace; }
+.views { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+figcaption { padding-bottom: 6px; font-weight: 600; }
+.views canvas, #overview { display: block; width: 100%; border-radius: 5px; border: 1px solid var(--line); background: #070b0e; image-rendering: pixelated; }
+.views canvas { aspect-ratio: 1; }
+.overview-title { margin: 14px 0 6px; font-size: 12px; }
+#overview { cursor: crosshair; }
+aside { align-self: start; }
+.progress { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.progress > div { background: #12181d; border-radius: 7px; padding: 9px 7px; text-align: center; }
+.progress strong, .progress span { display: block; }
+.progress strong { font-size: 21px; font-variant-numeric: tabular-nums; }
+.progress span { color: var(--muted); font-size: 11px; }
+#accepted, #current-state[data-status="accepted"] { color: var(--accent); }
+#rejected, #current-state[data-status="rejected"] { color: var(--reject); }
+.card { padding: 14px 0; border-block: 1px solid var(--line); }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; }
+h2 { font-size: 17px; }
+#current-state { font-size: 12px; color: var(--muted); }
+#prior { margin-top: 8px; color: #efcc92; font-size: 12px; }
+.model { display: grid; gap: 5px; margin-block: 12px 5px; }
+.model.filter { margin: 0 0 14px; }
+.model.filter select { min-width: 0; }
+.model select { width: 100%; }
+.prompt { margin-block: 14px 11px; }
+.decisions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.decisions button { display: flex; justify-content: space-between; gap: 4px; align-items: center; font-weight: 650; }
+.decisions .yes { background: var(--accent); border-color: var(--accent); color: #112820; }
+.decisions .no { background: #382226; border-color: #8c5457; color: #f9c1bf; }
+kbd { font-size: 11px; font-weight: 500; padding: 0 5px; border: 1px solid currentColor; border-radius: 3px; }
+.quiet { margin-top: 9px; padding-inline: 0; background: none; border-color: transparent; color: var(--muted); }
+.navigation { display: flex; justify-content: space-between; align-items: center; gap: 5px; margin-top: 12px; }
+#position { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.hint { font-size: 12px; margin-top: 10px; }
+@media (max-width: 850px) {
+  main { grid-template-columns: 1fr; }
+  header, main { padding-inline: 14px; }
+  aside { grid-row: 1; }
+}

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plane20 · Фильтр ROI</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <header>
+    <div><div class="tag">Plane20 / локальная медиана</div><h1>Фильтр ROI</h1></div>
+    <label class="model">Набор кандидатов <select id="model"></select></label>
+  </header>
+  <main>
+    <section class="workspace" aria-label="Просмотр медианы">
+      <div class="overview">
+        <div class="bar"><label for="crop">Участок</label> <select id="crop"></select>
+          <label for="size">Поле</label>
+          <select id="size"><option>64</option><option selected>96</option><option>128</option><option>192</option></select>
+          <output id="coordinates"></output>
+        </div>
+        <canvas id="overview" width="1376" height="320" tabindex="0" aria-label="Обзор поля. Щелчок выбирает участок, стрелки перемещают поле"></canvas>
+      </div>
+      <div class="selection">
+        <div><strong id="selected-title">Щёлкните по маске</strong><div id="selected-detail" class="muted">Shift + щелчок отмечает ROI сразу</div></div>
+        <button id="mark" type="button" disabled>Отметить как неверный</button>
+      </div>
+      <div class="pair">
+        <figure><figcaption>Оригинал</figcaption><canvas id="raw" width="512" height="512" aria-label="Кроп оригинала"></canvas></figure>
+        <figure><figcaption>Маски <span id="inside"></span></figcaption><canvas id="overlay" width="512" height="512" tabindex="0" aria-label="Маски ROI. Щелчок выбирает маску, Shift и щелчок отмечают её"></canvas></figure>
+      </div>
+      <div class="footer">
+        <div class="legend"><span class="active">Активные</span><span class="rejected">Отсечённые</span><span class="marked">Отмеченные</span></div>
+        <label><input id="showRejected" type="checkbox"> Показать отсечённые</label>
+        <label><input id="localContrast" type="checkbox" checked> Контраст по кропу</label>
+      </div>
+    </section>
+    <aside>
+      <section class="panel marks">
+        <div class="heading"><h2>Отмечены как неверные</h2></div>
+        <div class="counters">
+          <div><strong id="markedCount">0</strong><span>Всего</span></div>
+          <div><strong id="markedOff">0</strong><span>Отсечено</span></div>
+          <div><strong id="markedOn">0</strong><span>Активно</span></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="heading"><h2>Пороги</h2><button id="reset" type="button" class="subtle">Сбросить</button></div>
+        <label for="preset" class="muted">Пресет</label>
+        <select id="preset">
+          <option value="none">Все кандидаты</option>
+          <option value="black">Только почти чёрные ROI</option>
+          <option value="probe">Фильтр оболочки из проверки</option>
+          <option value="manual" disabled>Ручные настройки</option>
+        </select>
+        <div id="thresholds"></div>
+        <p id="fixed" class="muted"></p>
+      </section>
+      <section class="panel">
+        <div id="markList"></div>
+        <p id="status" aria-live="polite" class="muted">Загрузка…</p>
+      </section>
+    </aside>
+  </main>
+</body>
+</html>

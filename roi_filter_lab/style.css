@@ -1,0 +1,54 @@
+:root{color-scheme:dark;--bg:#101318;--panel:#171d25;--line:#2c3644;--text:#e8edf3;--muted:#a5b1bf;--green:#6cecb1;--orange:#ffbd73;--blue:#a8c2ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem clamp(1rem,3vw,2.5rem);border-bottom:1px solid var(--line)}
+.tag{color:var(--blue);font-size:.82rem;letter-spacing:.04em}
+h1,h2{margin:0;font-weight:650}h1{font-size:1.8rem}h2{font-size:1.05rem}
+.model{display:flex;align-items:center;gap:.65rem;color:var(--muted);font-size:.9rem}
+main{max-width:1670px;margin:auto;padding:1.2rem clamp(1rem,3vw,2.5rem);display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,335px);gap:1rem;align-items:start}
+.workspace,aside{display:grid;gap:.8rem;min-width:0}
+.overview,.panel,.selection,figure{border:1px solid var(--line);background:var(--panel);border-radius:10px;overflow:hidden}
+.bar,.footer,.selection,.heading{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+.bar{padding:.65rem;font-size:.88rem}
+.bar output{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+canvas{display:block;width:100%;background:#080a0d;image-rendering:pixelated}
+#overview{height:auto;aspect-ratio:1376/320;cursor:crosshair}
+#overlay{cursor:crosshair}
+canvas:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}
+figure{margin:0}
+figcaption{padding:.55rem .75rem;font-size:.9rem;display:flex;justify-content:space-between}
+figcaption span{color:var(--green);font-variant-numeric:tabular-nums}
+.footer{justify-content:space-between;font-size:.84rem;color:var(--muted)}
+.legend{display:flex;gap:.8rem}
+.legend span::before{display:inline-block;content:'';width:.8rem;height:2px;margin:0 .24rem .22rem 0;background:currentColor}
+.legend .active{color:var(--green)}.legend .rejected{color:#aab8d2}.legend .marked{color:var(--orange)}
+.selection{padding:.75rem;justify-content:space-between}
+.panel{padding:.9rem}.heading{justify-content:space-between;margin-bottom:.65rem}
+select,button,input[type=number]{color:var(--text);border:1px solid var(--line);background:#222b37;border-radius:6px;padding:.35rem .5rem;font:inherit}
+button{cursor:pointer}button:disabled{opacity:.45;cursor:default}
+button:hover:not(:disabled){background:#304055}
+button.subtle{padding:.25rem .45rem;font-size:.82rem}
+#mark:not(:disabled){border-color:#8a6947;color:var(--orange)}
+#preset{display:block;width:100%;margin:.25rem 0 .5rem;font-size:.92rem}
+.muted{color:var(--muted);font-size:.84rem}
+.rule{border-top:1px solid var(--line);padding-top:.6rem;margin-top:.6rem}
+.rule>label{font-size:.91rem;display:block}
+input[type=checkbox],input[type=range]{accent-color:var(--green)}
+.slider{display:grid;grid-template-columns:1fr 4.6rem;column-gap:.4rem;align-items:center;margin:.32rem 0 .53rem}
+.slider label{grid-column:1/-1;font-size:.82rem;color:var(--muted)}
+.slider input[type=number]{width:100%;font-size:.82rem;font-variant-numeric:tabular-nums}
+.slider input[type=range]{width:100%;min-width:0}
+fieldset{min-width:0;padding:0;border:0;margin:0}
+fieldset:disabled .slider{opacity:.48}
+#fixed,#status{margin:.5rem 0 0}
+.counters{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+.counters div{display:grid;border-bottom:1px solid var(--line);padding:0 0 .4rem}
+.counters strong{font-size:1.42rem;font-variant-numeric:tabular-nums}
+.counters span{font-size:.79rem;color:var(--muted)}
+#markedOff{color:var(--green)}#markedOn{color:var(--orange)}
+#markList{max-height:12rem;overflow:auto;margin-top:.5rem}
+.mark-row{width:100%;display:flex;justify-content:space-between;gap:.4rem;margin:.25rem 0;font-size:.84rem;text-align:left}
+.mark-row span{color:var(--muted)}
+@media(max-width:870px){main{grid-template-columns:1fr}aside{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){aside{grid-template-columns:1fr}.model{display:grid}.footer{justify-content:flex-start}.bar output{margin-left:0}}

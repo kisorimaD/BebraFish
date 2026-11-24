@@ -43,18 +43,39 @@ def angular_log_modulation(phase,coefficients):
     return value
 
 
-def shell_patch(center_yx,major,minor,angle_deg,ring,fill,blur,*,peak_radius=1.,width=.1,angular_coefficients=None):
+def gaussian_shell(radius, peak_radius, width):
+    return np.exp(-.5 * ((radius - peak_radius) / width)**2)
+
+
+def arc_log_gain(u, v, major, minor, coefficients):
+    """Evaluate the Plane20 brightness harmonics at equal ellipse arc length."""
+    phi = np.mod(np.arctan2(v, u), 2 * np.pi)
+    grid = np.linspace(0, 2 * np.pi, 1025)
+    speed = np.hypot(major * np.sin(grid), minor * np.cos(grid))
+    arc = np.r_[0, np.cumsum((speed[:-1] + speed[1:]) / 2 * np.diff(grid))]
+    phase = np.interp(phi, grid, arc) * (2 * np.pi / arc[-1])
+    return angular_log_modulation(phase, coefficients)
+
+
+def shell_patch(center_yx,major,minor,angle_deg,ring,fill,blur,*,peak_radius=1.,width=.1,
+                angular_coefficients=None,pixel_yx=None):
     """Gaussian shell in elliptical radius rho; rho=1 is annotation mid-shell.
 
     width is pre-blur Gaussian sigma in normalized radius, not physical wall
     thickness. PSF, sampling and neighbors alter measured apparent width.
+    With pixel_yx, diameters and pitches use the same physical unit.
     """
     theta=np.radians(angle_deg);c,s=np.cos(theta),np.sin(theta)
-    radius=int(np.ceil(major/2*(peak_radius+4*width)+3*blur))+2
+    extent=major/2*(peak_radius+4*width)
+    if pixel_yx is not None:
+        extent/=min(pixel_yx)
+    radius=int(np.ceil(extent+3*np.max(blur)))+2
     origin=np.floor(center_yx).astype(int)-radius;side=2*radius+1
     y,x=np.mgrid[:side,:side].astype(float);y-=center_yx[0]-origin[0];x-=center_yx[1]-origin[1]
+    if pixel_yx is not None:
+        y*=pixel_yx[0];x*=pixel_yx[1]
     rho=np.sqrt(((x*c+y*s)/(major/2))**2+((-x*s+y*c)/(minor/2))**2)
-    shell=np.exp(-.5*((rho-peak_radius)/width)**2)
+    shell=gaussian_shell(rho,peak_radius,width)
     core=np.exp(-(rho/max(.7*peak_radius,1e-5))**8)
     kernel=(1-fill)*shell+fill*core
     if angular_coefficients is not None:
@@ -62,14 +83,7 @@ def shell_patch(center_yx,major,minor,angle_deg,ring,fill,blur,*,peak_radius=1.,
         if coefficients.ndim!=2 or coefficients.shape[1]!=2 or not np.isfinite(coefficients).all():
             raise ValueError('Angular coefficients must be a finite K by 2 array')
         if np.any(coefficients):
-            # Convert ellipse parameter to equal arc-length phase, so bright
-            # arcs have comparable physical lengths around an elongated soma.
-            phi=np.mod(np.arctan2((-x*s+y*c)/(minor/2),(x*c+y*s)/(major/2)),2*np.pi)
-            grid=np.linspace(0,2*np.pi,1025)
-            speed=np.hypot(major*np.sin(grid),minor*np.cos(grid))
-            arc=np.r_[0,np.cumsum((speed[:-1]+speed[1:])/2*np.diff(grid))]
-            phase=np.interp(phi,grid,arc)*(2*np.pi/arc[-1])
-            log_gain=angular_log_modulation(phase,coefficients)
+            log_gain=arc_log_gain((x*c+y*s)/(major/2),(-x*s+y*c)/(minor/2),major,minor,coefficients)
             # Log subtraction avoids overflow and is cancelled by normalization.
             gain=np.exp(log_gain-log_gain.max())
             # Renormalize shell alone, keeping an optional core component fixed.

@@ -24,11 +24,7 @@ from soma_shell_model import shell_patch
 from diagnose_scene_realism import texture_tiles,summary,soma_light,neighbor_spread
 
 
-def effective_blur(signal,horizontal,vertical,mixture):
-    # array axes = displayed horizontal (native Y), vertical (native X)
-    sharp=gaussian_filter(signal,(horizontal*.5,vertical*.5))
-    broad=gaussian_filter(signal,(horizontal*1.5,vertical*1.5))
-    return sharp*(1-mixture)+broad*mixture
+from median_photometry import effective_blur
 
 
 def correlated_noise(shape,seed,sigma=.65,rho=.265):

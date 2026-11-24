@@ -13,9 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'simcalc_zebrafish_pipeline')]
 from compare_packing import relaxed_centers
 from empirical_morphology import build_empirical_scene
+from median_photometry import smooth_gain_field, cell_amplitudes
 from soma_shell_model import sample_morphology, sample_angular_coefficients
 from try_thinner_medium import thinner_shell_patch
-from try_correlated_cell_gain import smooth_gain_field, cell_amplitudes
 from try_heterogeneous_scene import effective_blur, correlated_noise
 from fit_contrast_sharpness import contrast_signal
 

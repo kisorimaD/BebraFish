@@ -21,27 +21,12 @@ import tifffile
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'simcalc_zebrafish_pipeline'))
 from empirical_morphology import build_empirical_scene
+from median_photometry import cell_amplitudes, smooth_gain_field
 from soma_shell_model import shell_patch
 from diagnose_scene_realism import soma_light
 from try_heterogeneous_scene import effective_blur,correlated_noise
 
 BINS=np.array([0,8,12,18,25,35,50,75,110.])
-
-
-def smooth_gain_field(shape,length_px,seed):
-    """Gaussian log-field with approximate covariance exp(-r²/(2*length²))."""
-    rng=np.random.default_rng(seed);padding=int(np.ceil(4*length_px))
-    padded=rng.normal(size=(shape[0]+2*padding,shape[1]+2*padding))
-    field=gaussian_filter(padded,length_px/np.sqrt(2),mode='constant')[padding:padding+shape[0],padding:padding+shape[1]]
-    return (field-field.mean())/max(field.std(),1e-12)
-
-
-def cell_amplitudes(field,centers,field_sigma,jitter_sigma,seed):
-    rng=np.random.default_rng(seed)
-    log_gain=field_sigma*map_coordinates(field,centers.T,order=1,mode='nearest')+jitter_sigma*rng.normal(size=len(centers))
-    amplitudes=np.exp(log_gain-.5*(field_sigma**2+jitter_sigma**2))
-    # Global normalization only; does not divide away local group brightness.
-    return amplitudes/amplitudes.mean()
 
 
 def variogram(values,centers):

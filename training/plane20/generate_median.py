@@ -15,8 +15,8 @@ from .center_data import ROI_SIZE, ellipse_bounds
 from compare_packing import relaxed_centers
 from empirical_morphology import build_empirical_scene
 from soma_shell_model import sample_morphology, sample_angular_coefficients, shell_patch
-from try_correlated_cell_gain import cell_amplitudes, smooth_gain_field
-from try_heterogeneous_scene import effective_blur
+from median_photometry import (cell_amplitudes, median_background, median_cell_light,
+                               median_texture, smooth_gain_field, structured_amount, structured_layer)
 
 AXES = ('major_axis_px', 'minor_axis_px', 'orientation_deg')
 
@@ -72,24 +72,15 @@ def fade_region(shape, origin):
 
 def structured_render(background, cells, tissue, config, seed):
     rng = np.random.default_rng(seed)
-    # Random locations at the scale of several somas, with no copied pixels.
     placement = smooth_gain_field(cells.shape, 35, rng.integers(2**32))
-    threshold = np.percentile(placement[tissue], 65)
-    amount = np.clip((placement-threshold)/1.2, 0, 1)
-    # Fade gradually at the perimeter while allowing diffuse light between somas.
-    amount *= np.clip(gaussian_filter(tissue.astype(np.float32), 9)*1.5, 0, 1)
-    field = gaussian_filter(rng.standard_normal(cells.shape, dtype=np.float32), config['texture_sigma'])
-    field /= max(float(field.std()), 1e-6)
-    field += .24*np.maximum(field-.55, 0)**2
-    field -= gaussian_filter(field, 9)
+    amount = structured_amount(placement, tissue)
+    field = median_texture(rng.standard_normal(cells.shape, dtype=np.float32), config['texture_sigma'])
     broad = gaussian_filter(field, 3)-gaussian_filter(field, 7)
     scale = config['texture_band_rms']/max(float(broad[tissue].std()), 1e-6)
     texture = field*scale*amount*rng.uniform(.72, 1.08)
     subdued = fade_region(cells.shape, config['subdued_origin'])
-    fraction_removed = 1-(1-(1-config['subdued_gain'])*subdued)*(1-(1-config['texture_shell_gain'])*amount)
-    removed = (cells*fraction_removed).astype(np.float32)
-    diffuse = np.maximum(background+gaussian_filter(removed, 8)+texture, config['density_floor'])
-    return diffuse+cells-removed
+    return structured_layer(background, cells, amount, texture, subdued, config['subdued_gain'],
+                            config['texture_shell_gain'], config['density_floor'])
 
 
 def generate_pair(job, profile_path):
@@ -122,9 +113,8 @@ def generate_pair(job, profile_path):
         settings, centers, None, seed, geometry=geom, angular_coefficients=angular,
         amplitudes=amplitudes*.36/(config['width']*config['peak']),
         patch_renderer=partial(shell_patch, width=config['width'], peak_radius=config['peak']))
-    cells = (effective_blur(scene['signal'], .2, .8, mixture)*profile['normalizer']
-             *np.clip(distance/2, 0, 1)*config['amplitude']).astype(np.float32)
-    background = np.maximum(profile['median_envelope']-gaussian_filter(cells, 12), config['density_floor'])
+    cells = median_cell_light(scene['signal'], mixture, distance, profile['normalizer'], config['amplitude'])
+    background = median_background(profile['median_envelope'], cells, config['density_floor'])
     image = np.rint(np.clip(background+cells, 0, 65535)).astype(np.uint16)
     image_structured = np.rint(np.clip(structured_render(background,cells,tissue,config,texture),0,65535)).astype(np.uint16)
     relative = Path(split)/f'scene_{index:05d}.npz'

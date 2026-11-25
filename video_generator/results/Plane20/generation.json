@@ -1,0 +1,765 @@
+{
+  "bank": "trace_bank.npz",
+  "input_signal": "(F - background - median(F - background)) / median(F); background is zero when it could not be estimated locally.",
+  "scene": "scene_00000.npz",
+  "seed": 20261125,
+  "activity_frames": 1000,
+  "playback_fps": 3,
+  "gif_frames": 180,
+  "gif_duration_ms": 60000,
+  "reference_playback_fps": 12.5,
+  "source_fps": null,
+  "width": 1376,
+  "height": 640,
+  "panel_height": 320,
+  "panels": [
+    "real",
+    "synthetic"
+  ],
+  "real_source": "Plane_Aligned_20.tiff",
+  "displayed_source_frames": [
+    2,
+    6,
+    10,
+    14,
+    18,
+    22,
+    27,
+    31,
+    35,
+    39,
+    43,
+    47,
+    52,
+    56,
+    60,
+    64,
+    68,
+    72,
+    77,
+    81,
+    85,
+    89,
+    93,
+    97,
+    102,
+    106,
+    110,
+    114,
+    118,
+    122,
+    127,
+    131,
+    135,
+    139,
+    143,
+    147,
+    152,
+    156,
+    160,
+    164,
+    168,
+    172,
+    177,
+    181,
+    185,
+    189,
+    193,
+    197,
+    202,
+    206,
+    210,
+    214,
+    218,
+    222,
+    227,
+    231,
+    235,
+    239,
+    243,
+    247,
+    252,
+    256,
+    260,
+    264,
+    268,
+    272,
+    277,
+    281,
+    285,
+    289,
+    293,
+    297,
+    302,
+    306,
+    310,
+    314,
+    318,
+    322,
+    327,
+    331,
+    335,
+    339,
+    343,
+    347,
+    352,
+    356,
+    360,
+    364,
+    368,
+    372,
+    377,
+    381,
+    385,
+    389,
+    393,
+    397,
+    402,
+    406,
+    410,
+    414,
+    418,
+    422,
+    427,
+    431,
+    435,
+    439,
+    443,
+    447,
+    452,
+    456,
+    460,
+    464,
+    468,
+    472,
+    477,
+    481,
+    485,
+    489,
+    493,
+    497,
+    502,
+    506,
+    510,
+    514,
+    518,
+    522,
+    527,
+    531,
+    535,
+    539,
+    543,
+    547,
+    552,
+    556,
+    560,
+    564,
+    568,
+    572,
+    577,
+    581,
+    585,
+    589,
+    593,
+    597,
+    602,
+    606,
+    610,
+    614,
+    618,
+    622,
+    627,
+    631,
+    635,
+    639,
+    643,
+    647,
+    652,
+    656,
+    660,
+    664,
+    668,
+    672,
+    677,
+    681,
+    685,
+    689,
+    693,
+    697,
+    702,
+    706,
+    710,
+    714,
+    718,
+    722,
+    727,
+    731,
+    735,
+    739,
+    743,
+    747
+  ],
+  "source_planes": [
+    15,
+    16,
+    17,
+    18,
+    19,
+    21,
+    22,
+    23,
+    24
+  ],
+  "unique_donors": 1860,
+  "light_floor_count": 26,
+  "display_black_adu": 100.0,
+  "display_white_adu": 332.4638366699219,
+  "coordination": {
+    "targets": {
+      "peak_prominence": 0.06,
+      "near_correlation": 0.09983842933011103,
+      "mid_correlation": 0.015254839667558091,
+      "near_peak_coincidence": 0.24309618026018143,
+      "near_p90": 0.41550766117479243,
+      "mid_p90": 0.2218185340622958,
+      "group_threshold": 0.2218185340622958,
+      "group_triple_frames": 9.44380937847246
+    },
+    "previous": [
+      {
+        "min_px": 0,
+        "max_px": 15,
+        "pairs": 5523,
+        "correlation": 0.0032072460572931507,
+        "correlation_residual": -0.0012360717104969372,
+        "p90_correlation_residual": 0.09416731113940184,
+        "coincidence": 0.14169858396053314,
+        "coincidence_shifted": 0.12373210489749908
+      },
+      {
+        "min_px": 15,
+        "max_px": 30,
+        "pairs": 16992,
+        "correlation": 0.003935309245042278,
+        "correlation_residual": -0.001269513775497401,
+        "p90_correlation_residual": 0.10255442902943554,
+        "coincidence": 0.1430511772632599,
+        "coincidence_shifted": 0.12797975540161133
+      },
+      {
+        "min_px": 30,
+        "max_px": 60,
+        "pairs": 57720,
+        "correlation": 0.004609345263877717,
+        "correlation_residual": -0.0006206061473467035,
+        "p90_correlation_residual": 0.10000534774202573,
+        "coincidence": 0.14390765130519867,
+        "coincidence_shifted": 0.12749461829662323
+      },
+      {
+        "min_px": 60,
+        "max_px": null,
+        "pairs": 1648635,
+        "correlation": 0.005066536997609015,
+        "correlation_residual": -0.0002743081168325481,
+        "p90_correlation_residual": 0.09897422431061995,
+        "coincidence": 0.1328633576631546,
+        "coincidence_shifted": 0.11615942418575287
+      }
+    ],
+    "first_pass": [
+      {
+        "min_px": 0,
+        "max_px": 15,
+        "pairs": 5523,
+        "correlation": 0.06471041931734837,
+        "correlation_residual": 0.05572506975344359,
+        "p90_correlation_residual": 0.14306274622311638,
+        "coincidence": 0.16555055975914001,
+        "coincidence_shifted": 0.1236814633011818
+      },
+      {
+        "min_px": 15,
+        "max_px": 30,
+        "pairs": 16992,
+        "correlation": 0.015839375919846577,
+        "correlation_residual": 0.011934205493974632,
+        "p90_correlation_residual": 0.10206223766941976,
+        "coincidence": 0.1296960860490799,
+        "coincidence_shifted": 0.12747128307819366
+      },
+      {
+        "min_px": 30,
+        "max_px": 60,
+        "pairs": 57720,
+        "correlation": 0.0031478413343396746,
+        "correlation_residual": 0.0018152677294046727,
+        "p90_correlation_residual": 0.08000601315733252,
+        "coincidence": 0.12846145033836365,
+        "coincidence_shifted": 0.1274692863225937
+      },
+      {
+        "min_px": 60,
+        "max_px": null,
+        "pairs": 1648635,
+        "correlation": -1.7251122332659256e-05,
+        "correlation_residual": -0.0007661817286635154,
+        "p90_correlation_residual": 0.0746321540003456,
+        "coincidence": 0.1174774095416069,
+        "coincidence_shifted": 0.11626136302947998
+      }
+    ],
+    "coordinated": [
+      {
+        "min_px": 0,
+        "max_px": 15,
+        "pairs": 5523,
+        "correlation": 0.06032496813529253,
+        "correlation_residual": 0.05617948961274776,
+        "p90_correlation_residual": 0.15195763386766878,
+        "coincidence": 0.1635521501302719,
+        "coincidence_shifted": 0.12459210306406021
+      },
+      {
+        "min_px": 15,
+        "max_px": 30,
+        "pairs": 16992,
+        "correlation": 0.019161066045075427,
+        "correlation_residual": 0.016400288142368206,
+        "p90_correlation_residual": 0.11006466123804332,
+        "coincidence": 0.13048677146434784,
+        "coincidence_shifted": 0.1276635080575943
+      },
+      {
+        "min_px": 30,
+        "max_px": 60,
+        "pairs": 57720,
+        "correlation": 0.003177608460953853,
+        "correlation_residual": 0.0024972714344476963,
+        "p90_correlation_residual": 0.08418513974630185,
+        "coincidence": 0.12882812321186066,
+        "coincidence_shifted": 0.12758131325244904
+      },
+      {
+        "min_px": 60,
+        "max_px": null,
+        "pairs": 1648635,
+        "correlation": -6.319969162224467e-05,
+        "correlation_residual": -0.0007999161260587391,
+        "p90_correlation_residual": 0.0782081882247766,
+        "coincidence": 0.11742740124464035,
+        "coincidence_shifted": 0.11632349342107773
+      }
+    ],
+    "groups": {
+      "reference_by_group_size": {
+        "3": {
+          "mean_frames": 3.014838580308803,
+          "sampled_groups": 4987
+        },
+        "4": {
+          "mean_frames": 10.056625667208168,
+          "sampled_groups": 4309
+        },
+        "5": {
+          "mean_frames": 20.970269433261073,
+          "sampled_groups": 3229
+        }
+      },
+      "original_timeline": {
+        "groups": 123,
+        "member_cells": 467,
+        "median_pair_correlation": 0.0034533500455560667,
+        "mean_frames_with_three_peaks": 2.203252032520325
+      },
+      "coordinated": {
+        "groups": 123,
+        "member_cells": 467,
+        "median_pair_correlation": 0.044630657564396256,
+        "mean_frames_with_three_peaks": 6.7073170731707314
+      }
+    }
+  },
+  "spatial_amplitude": {
+    "reference_plane": 20,
+    "reference_rois": 1005,
+    "bandwidth_px": 35,
+    "spatial_holdout_block_px": 48,
+    "heldout_spearman": 0.5035680074278714,
+    "heldout_log_rmse_model": 0.37598835225088495,
+    "heldout_log_rmse_global": 0.4240915091685706,
+    "amplitude_definition": "P95 minus temporal median of the donor relative fluorescence",
+    "spatial_expected_p10_p90": [
+      0.04668096141027311,
+      0.06857356287427266
+    ],
+    "spatial_assigned_p10_p90": [
+      0.04838213345846781,
+      0.06727346692099381
+    ],
+    "matched_amplitude_rmse": 0.0009179685730487108,
+    "map_rmse": 0.0025136594957910433,
+    "maps_median_amplitude": [
+      0.05477642230208759,
+      0.05499718783677625
+    ],
+    "donor_plane20_excluded": true,
+    "scene_rank_r_before": 0.005385999010743076,
+    "scene_rank_r_after": 0.34010157952396175
+  },
+  "spatial_baseline": null,
+  "glare": null,
+  "optical_layers": {
+    "halo_sigma_px": 5.0,
+    "halo_integrated_fraction": 0.45,
+    "background_glow_clearance_px": 8.0,
+    "background_glow_fade_px": 10.0,
+    "background_glow_strength": 0.55,
+    "soma_pixel_cap_adu": 342.84051513671875,
+    "background_glow_max_near_soma_adu": 0.0,
+    "background_glow_mean_outside_adu": 0.4199760836636036,
+    "static_halo_p95_adu": 23.1590633392334,
+    "user_crop_validation": {
+      "previous": {
+        "black_background_fraction": 0.20835009447187175,
+        "surrounding_median_adu": 117.32083488913143,
+        "soma_p90_adu": 332.4638366699219
+      },
+      "with_halo": {
+        "black_background_fraction": 2.133235813981837e-05,
+        "surrounding_median_adu": 145.5811444450827,
+        "soma_p90_adu": 332.4638366699219
+      }
+    }
+  },
+  "photometry": {
+    "fitted_frames": [
+      0,
+      17,
+      34,
+      101,
+      118,
+      136,
+      203,
+      220,
+      237,
+      304,
+      322,
+      339,
+      406,
+      423,
+      440,
+      508,
+      525,
+      542,
+      609,
+      626,
+      644,
+      711,
+      728,
+      745,
+      812,
+      830,
+      847,
+      914,
+      931,
+      949
+    ],
+    "validation_frames": [
+      50,
+      67,
+      84,
+      151,
+      168,
+      186,
+      253,
+      270,
+      287,
+      354,
+      372,
+      389,
+      456,
+      473,
+      490,
+      558,
+      575,
+      592,
+      659,
+      676,
+      694,
+      761,
+      778,
+      795,
+      862,
+      880,
+      897,
+      964,
+      981,
+      999
+    ],
+    "quantile_probabilities": [
+      0.02,
+      0.05,
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      0.9,
+      0.95,
+      0.98,
+      0.995
+    ],
+    "reference": {
+      "mean_adu": 149.2776615170288,
+      "std_adu": 49.58511521652462,
+      "quantiles_adu": [
+        100.0,
+        100.0,
+        101.0,
+        110.0,
+        138.0,
+        170.0,
+        215.0,
+        255.0,
+        304.0,
+        332.4638366699219
+      ],
+      "clipped_black_fraction": 0.08396333333333333,
+      "clipped_white_fraction": 0.012263333333333333
+    },
+    "prior": {
+      "mean_adu": 162.94596559646857,
+      "std_adu": 57.210511367086575,
+      "quantiles_adu": [
+        100.0,
+        100.0,
+        102.6048317671796,
+        112.15595492507848,
+        147.5329350597287,
+        201.63756180637887,
+        246.38930458033684,
+        273.34539684564675,
+        306.36094273463146,
+        332.4638366699219
+      ],
+      "clipped_black_fraction": 0.05867666666666667,
+      "clipped_white_fraction": 0.01008
+    },
+    "calibrated": {
+      "mean_adu": 149.70704335266646,
+      "std_adu": 50.022217546739,
+      "quantiles_adu": [
+        100.0,
+        100.0,
+        100.92309522472674,
+        109.49681295074481,
+        137.1930664185197,
+        171.4364499701942,
+        218.17321941123885,
+        254.86895260762324,
+        302.5753687108654,
+        332.4638366699219
+      ],
+      "clipped_black_fraction": 0.08403333333333333,
+      "clipped_white_fraction": 0.011236666666666667
+    },
+    "quantile_rmse_before_after_adu": [
+      15.577072486841026,
+      1.228401849301871
+    ],
+    "mapping_input_adu": [
+      70.0,
+      95.0,
+      110.0,
+      130.0,
+      155.0,
+      185.0,
+      220.0,
+      265.0,
+      320.0,
+      410.0,
+      520.0
+    ],
+    "mapping_output_adu": [
+      70.0,
+      95.0,
+      107.89529737743068,
+      125.11925434483655,
+      143.36964181843015,
+      158.91661746452024,
+      184.26327000759727,
+      247.19740919970806,
+      330.32068138868755,
+      410.0,
+      520.0
+    ],
+    "fitted_moment_offset_adu": -0.4061463997035595,
+    "fitted_moment_gain": 1.0017013026409562
+  },
+  "gif_validation": {
+    "validation_frames": 84,
+    "real": {
+      "mean_adu": 149.8360595703125,
+      "std_adu": 49.73052978515625,
+      "quantiles_adu": [
+        100.0,
+        100.0,
+        101.8232421875,
+        110.0278549194336,
+        139.1997833251953,
+        171.10658264160156,
+        213.95285034179688,
+        254.97589111328125,
+        307.85003662109375,
+        332.4638366699219
+      ],
+      "clipped_black_fraction": 0.08001785714285714,
+      "clipped_white_fraction": 0.012966666666666666,
+      "grain_by_adu": [
+        {
+          "range_adu": [
+            115,
+            150
+          ],
+          "pairs": 5624,
+          "robust_sd_adu": 9.46097469329834
+        },
+        {
+          "range_adu": [
+            150,
+            185
+          ],
+          "pairs": 4423,
+          "robust_sd_adu": 11.488373756408691
+        },
+        {
+          "range_adu": [
+            185,
+            220
+          ],
+          "pairs": 1283,
+          "robust_sd_adu": 15.543105125427246
+        },
+        {
+          "range_adu": [
+            220,
+            260
+          ],
+          "pairs": 459,
+          "robust_sd_adu": 21.625144958496094
+        },
+        {
+          "range_adu": [
+            260,
+            310
+          ],
+          "pairs": 92,
+          "robust_sd_adu": 23.652509689331055
+        }
+      ]
+    },
+    "synthetic": {
+      "mean_adu": 150.45541381835938,
+      "std_adu": 51.00885009765625,
+      "quantiles_adu": [
+        100.0,
+        100.0,
+        100.91162109375,
+        110.0278549194336,
+        137.3765411376953,
+        172.01821899414062,
+        220.334228515625,
+        259.53399658203125,
+        309.67327880859375,
+        332.4638366699219
+      ],
+      "clipped_black_fraction": 0.09071785714285714,
+      "clipped_white_fraction": 0.013147619047619047,
+      "grain_by_adu": [
+        {
+          "range_adu": [
+            115,
+            150
+          ],
+          "pairs": 5682,
+          "robust_sd_adu": 9.461008071899414
+        },
+        {
+          "range_adu": [
+            150,
+            185
+          ],
+          "pairs": 4240,
+          "robust_sd_adu": 12.839954376220703
+        },
+        {
+          "range_adu": [
+            185,
+            220
+          ],
+          "pairs": 1011,
+          "robust_sd_adu": 18.246232986450195
+        },
+        {
+          "range_adu": [
+            220,
+            260
+          ],
+          "pairs": 525,
+          "robust_sd_adu": 23.652498245239258
+        },
+        {
+          "range_adu": [
+            260,
+            310
+          ],
+          "pairs": 113,
+          "robust_sd_adu": 26.35565948486328
+        }
+      ]
+    }
+  },
+  "temporal_transform": "Full traces are circularly shifted by the offsets in assignments.csv. GIF selects frames from those traces without interpolation. Relative light max(0, 1 + input signal) divided by each trace median.",
+  "detector_noise": {
+    "intensity_adu": [
+      104.0,
+      125.0,
+      145.0,
+      164.0,
+      183.0,
+      203.0,
+      225.0,
+      243.5,
+      264.5,
+      283.75,
+      304.0,
+      325.0,
+      341.5,
+      363.5,
+      384.0,
+      403.5
+    ],
+    "sigma_adu": [
+      4.842151237568418,
+      7.263226467016718,
+      9.079033862442715,
+      10.894840479196896,
+      13.013281791634045,
+      16.039625633776463,
+      18.460701641896584,
+      19.97387434163961,
+      21.78968095839379,
+      22.697584266770882,
+      23.30285210079318,
+      24.21075696651391,
+      24.816024800536212,
+      27.23710080865633,
+      27.53973472566748,
+      27.53973472566748
+    ],
+    "seed": 20261127,
+    "scale": 1.0
+  },
+  "profile": "../../plane20_synthetic/plane20_synthetic/profiles/plane20.npz",
+  "reference_median": "reference_median.tiff"
+}

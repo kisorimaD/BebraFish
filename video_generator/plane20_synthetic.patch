@@ -1,0 +1,57 @@
+--- a/plane20_synthetic/plane20_synthetic/training/plane20/generate_median.py
++++ b/plane20_synthetic/plane20_synthetic/training/plane20/generate_median.py
+@@ -67,7 +67,7 @@
+     return diffuse+cells-removed
+ 
+ 
+-def generate_pair(job, profile_path):
++def generate_pair(job, profile_path, *, structured=True):
+     split, index, seed, output = job
+     with np.load(profile_path) as source:
+         profile = {key: source[key] for key in source.files}
+@@ -80,7 +80,7 @@
+     allowed = profile['neuron_support'].astype(bool)
+     distance = distance_transform_edt(allowed)
+     support = distance_transform_edt(tissue) > 1.5*settings['sigma_px']
+-    centers = relaxed_centers(support, profile['density'], 6830, packing)
++    centers = relaxed_centers(support, profile['density'], config.get('packing_count', 6830), packing)
+     geom = sample_morphology(json.loads(str(profile['morphology_json'])), len(centers), morphology)
+     shape_gain = np.sqrt(config['aspect_scale'])
+     geom['major_axis_px'] *= config['size_scale']*shape_gain
+@@ -101,14 +101,19 @@
+              *np.clip(distance/2, 0, 1)*config['amplitude']).astype(np.float32)
+     background = np.maximum(profile['median_envelope']-gaussian_filter(cells, 12), config['density_floor'])
+     image = np.rint(np.clip(background+cells, 0, 65535)).astype(np.uint16)
+-    image_structured = np.rint(np.clip(structured_render(background,cells,tissue,config,texture),0,65535)).astype(np.uint16)
++    frames = {'image': image}
++    if structured:
++        frames['image_structured'] = np.rint(np.clip(
++            structured_render(background,cells,tissue,config,texture),0,65535)).astype(np.uint16)
+     relative = Path(split)/f'scene_{index:05d}.npz'
+     path = Path(output)/relative
+-    np.savez_compressed(path, image=image, image_structured=image_structured, centers=centers, **geom,
++    path.parent.mkdir(parents=True, exist_ok=True)
++    np.savez_compressed(path, **frames, centers=centers, **geom,
+         instance_offsets=scene['instance_offsets'], instance_pixel_index=scene['instance_pixel_index'],
+         seed=np.uint64(seed))
+     return dict(split=split, index=index, seed=seed, cells=len(centers), path=relative.as_posix(),
+-                sha256=hashlib.sha256(path.read_bytes()).hexdigest(), renders=['baseline','structured'])
++                sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
++                renders=['baseline','structured'] if structured else ['baseline'])
+ 
+ 
+ def main():
+--- a/plane20_synthetic/plane20_synthetic/training/plane20/morphology.py
++++ b/plane20_synthetic/plane20_synthetic/training/plane20/morphology.py
+@@ -14,6 +14,11 @@
+     correction. Size/elongation independence is an explicit approximation.
+     """
+     rng=np.random.default_rng(seed)
++    if 'empirical_axes_px' in report:
++        samples = np.asarray(report['empirical_axes_px'], dtype=float)
++        major, minor, angle = samples[rng.integers(len(samples), size=count)].T.copy()
++        return dict(major_axis_px=major, minor_axis_px=minor, orientation_deg=angle,
++                    diameter_px=np.sqrt(major * minor), aspect_ratio=major / minor)
+     normal=next(m for m in report['diameter_fit_comparison'] if m['name']=='normal')
+     mu,sd=normal['parameters']
+     gamma=next(m for m in report['aspect_ratio_excess_fit_comparison'] if m['name']=='gamma')

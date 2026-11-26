@@ -69,6 +69,21 @@ python analysis/plane20_gcamp8f_response/run_dataset.py \
 При необходимости укажите `--model-code` и `--segment-python`.
 При переходе на другую оптику или масштаб просмотрите маски в `per_plane/`.
 
+## Групповое сэмплирование и вспышки
+
+После основного запуска можно подогнать временную согласованность сом
+и широкие колебания фона по измеренным данным. Для проверки сохраняются
+метрики на отложенных отрезках.
+
+```bash
+python analysis/plane20_gcamp8f_response/calibrate_flash_dynamics.py \
+  --source ./synthetic_run/render \
+  --output ./synthetic_run/flashes
+```
+
+[Пример Plane20](results/Plane20/README.md) включает данные для восстановления
+итоговых кадров этого этапа.
+
 ## Результаты
 
 - `per_plane/` содержит центры, маски и извлечённые трассы.

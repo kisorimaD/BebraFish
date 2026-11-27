@@ -63,6 +63,8 @@ def main():
                         help='Keep the uncalibrated synthetic scene brightness.')
     parser.add_argument('--pairwise-only', action='store_true',
                         help='Match median correlations without explicit groups.')
+    parser.add_argument('--activity-sample', type=Path, help='Use a scene-aligned NPZ with dff and bank_columns.')
+    parser.add_argument('--calibration-only', action='store_true', help='Save the fitted optical model and traces.')
     args = parser.parse_args()
     if not np.isfinite(args.noise_scale) or args.noise_scale < 0:
         parser.error('--noise-scale must be nonnegative and finite.')
@@ -81,30 +83,45 @@ def main():
     bank_path = args.bank.resolve()
     bank_summary = json.loads((bank_path.parent / 'summary.json').read_text())
     spatial_amplitude = None
+    donor_scope = 'other-planes'
     with np.load(bank_path, allow_pickle=False) as source:
         bank = source['dff']
         if not np.isfinite(bank).all() or bank.shape[1] < cells:
             raise ValueError('The bank must contain one finite trace per cell.')
-        available = np.flatnonzero(source['plane'] != args.reference_plane)
+        donor_planes = source['plane']
+        if args.activity_sample is not None:
+            with np.load(args.activity_sample, allow_pickle=False) as sample:
+                columns, measured = sample['bank_columns'], sample['dff']
+                donor_scope = str(sample['donor_scope']) if 'donor_scope' in sample else donor_scope
+                np.testing.assert_array_equal(sample['centers_yx'], scene['centers'])
+            if donor_scope not in ('other-planes', 'all-planes'):
+                raise ValueError(f'Unknown donor scope: {donor_scope}.')
+        available = (np.arange(len(donor_planes)) if donor_scope == 'all-planes' else
+                     np.flatnonzero(donor_planes != args.reference_plane))
         if len(available) < cells:
-            raise ValueError('The donor planes must contain at least one accepted trace per synthetic soma.')
-        # Preserve the historical random seed order for the original Plane20 benchmark.
-        pool = bank.shape[1] if args.bank.resolve() == BANK and not args.uniform_amplitudes else available
-        columns = np.random.default_rng(args.seed).choice(pool, cells, replace=False)
-        if not args.uniform_amplitudes:
-            columns, expected, donor_amplitudes, assigned_map, spatial_amplitude = spatial_assignment(
-                source, columns, scene['centers'], args.seed + 4, args.reference_plane)
-            print('Spatial amplitude validation:', spatial_amplitude, flush=True)
+            raise ValueError('The eligible donor pool must contain one accepted trace per synthetic soma.')
+        if args.activity_sample is not None:
+            if (columns.shape != (cells,) or measured.shape != (len(bank), cells) or
+                    not np.isfinite(measured).all() or not np.isin(columns, available).all()):
+                raise ValueError('The activity sample does not match the scene and donor bank.')
+        else:
+            # Preserve the historical random seed order for the original Plane20 benchmark.
+            pool = bank.shape[1] if args.bank.resolve() == BANK and not args.uniform_amplitudes else available
+            columns = np.random.default_rng(args.seed).choice(pool, cells, replace=False)
+            if not args.uniform_amplitudes:
+                columns, expected, donor_amplitudes, assigned_map, spatial_amplitude = spatial_assignment(
+                    source, columns, scene['centers'], args.seed + 4, args.reference_plane)
+                print('Spatial amplitude validation:', spatial_amplitude, flush=True)
+            measured = bank[:, columns]
         reference_centers = source['centers_yx'][plane20_reference(source, args.reference_plane)]
-        measured = bank[:, columns]
-        planes, mask_ids = source['plane'][columns], source['mask_id'][columns]
+        planes, mask_ids = donor_planes[columns], source['mask_id'][columns]
         donor_centers = source['centers_yx'][columns]
     assert len(set(zip(planes, mask_ids))) == cells
     frames = len(measured)
     offsets = np.zeros(cells, dtype=int)
     groups = None
     coordination = None
-    if not args.independent:
+    if not args.independent and args.activity_sample is None:
         reference = json.loads((bank_path.parent / 'coordination.json').read_text())
         prominence = reference['peak_prominence_dff']
         targets = dict(peak_prominence=prominence, near_correlation=reference['by_distance'][0]['correlation_residual'],
@@ -209,8 +226,9 @@ def main():
         output = Path(temporary) / args.output.name
         output.mkdir()
         movie = output / 'plane20_recorded_activity.gif'
-        gif_frames = min(MAX_GIF_SECONDS * GIF_FPS, int(frames * GIF_FPS / fps))
+        gif_frames = max(1, min(MAX_GIF_SECONDS * GIF_FPS, int(frames * GIF_FPS / fps)))
         source_indices = ((np.arange(gif_frames) + .5) * fps / GIF_FPS).astype(int)
+        source_indices = np.minimum(source_indices, frames - 1)
         # Display the long axis horizontally in both panels.
         transpose = base.shape[0] >= base.shape[1]
         panel_width, panel_height = base.shape if transpose else base.shape[::-1]
@@ -229,35 +247,37 @@ def main():
             scaled = np.rint((oriented.astype(np.float32) - black) * (255 / (white - black)))
             return np.clip(scaled, 0, 255).astype(np.uint8)
 
-        with tifffile.TiffFile(args.reference_tiff) as real:
-            if real.pages[0].shape != base.shape or len(real.pages) <= source_indices[-1]:
-                raise ValueError('The real Plane20 recording does not match the rendered frames.')
-            with subprocess.Popen(command, stdin=subprocess.PIPE) as writer:
-                with writer.stdin:
-                    for indices in np.array_split(source_indices, max(1, (gif_frames + 15) // 16)):
-                        activity = (modulation[indices] @ maps).reshape(-1, *base.shape)
-                        halo_activity = halo_light(activity) if optical is not None else np.zeros_like(activity)
-                        block = base + activity + halo_activity
-                        for source_index, frame, halo_delta in zip(indices, block, halo_activity):
-                            if noise_fraction:
-                                if optical is None:
-                                    noise, _ = correlated_noise(base.shape, noise_seeds[source_index])
-                                    noise_sigma = noise_fraction * np.interp(frame, noise_levels, noise_estimates)
-                                    frame = frame + noise_sigma * noise
-                                else:
-                                    background_noise, halo_noise = add_optical_noise(
-                                        frame, halo_static + halo_delta, noise_levels, noise_fraction * noise_estimates,
-                                        noise_seeds[source_index], halo_seeds[source_index])
-                                    frame = frame + background_noise + halo_noise
-                            reference_frame = real.pages[int(source_index)].asarray()
-                            stacked = np.concatenate((display(reference_frame), display(frame)), axis=0)
-                            writer.stdin.write(stacked.tobytes())
-                if writer.wait():
-                    raise RuntimeError('GIF encoding failed.')
-        duration_ms, gif_validation = validate_comparison_gif(
-            movie, source_indices, panel_width, panel_height, black, white, adaptive=not legacy_profile)
-        assert abs(duration_ms - gif_frames * 1000 / GIF_FPS) <= 20
-        assert duration_ms <= MAX_GIF_SECONDS * 1000
+        duration_ms, gif_validation = None, None
+        if not args.calibration_only:
+            with tifffile.TiffFile(args.reference_tiff) as real:
+                if real.pages[0].shape != base.shape or len(real.pages) <= source_indices[-1]:
+                    raise ValueError('The real Plane20 recording does not match the rendered frames.')
+                with subprocess.Popen(command, stdin=subprocess.PIPE) as writer:
+                    with writer.stdin:
+                        for indices in np.array_split(source_indices, max(1, (gif_frames + 15) // 16)):
+                            activity = (modulation[indices] @ maps).reshape(-1, *base.shape)
+                            halo_activity = halo_light(activity) if optical is not None else np.zeros_like(activity)
+                            block = base + activity + halo_activity
+                            for source_index, frame, halo_delta in zip(indices, block, halo_activity):
+                                if noise_fraction:
+                                    if optical is None:
+                                        noise, _ = correlated_noise(base.shape, noise_seeds[source_index])
+                                        noise_sigma = noise_fraction * np.interp(frame, noise_levels, noise_estimates)
+                                        frame = frame + noise_sigma * noise
+                                    else:
+                                        background_noise, halo_noise = add_optical_noise(
+                                            frame, halo_static + halo_delta, noise_levels, noise_fraction * noise_estimates,
+                                            noise_seeds[source_index], halo_seeds[source_index])
+                                        frame = frame + background_noise + halo_noise
+                                reference_frame = real.pages[int(source_index)].asarray()
+                                stacked = np.concatenate((display(reference_frame), display(frame)), axis=0)
+                                writer.stdin.write(stacked.tobytes())
+                    if writer.wait():
+                        raise RuntimeError('GIF encoding failed.')
+            duration_ms, gif_validation = validate_comparison_gif(
+                movie, source_indices, panel_width, panel_height, black, white, adaptive=not legacy_profile)
+            assert abs(duration_ms - gif_frames * 1000 / GIF_FPS) <= 20
+            assert duration_ms <= MAX_GIF_SECONDS * 1000
         if spatial_amplitude is not None:
             plot_amplitude(output / 'spatial_amplitude.png', scene, expected, assigned_map, args.reference_plane)
         if spatial_baseline is not None:
@@ -285,21 +305,26 @@ def main():
                         panels=['real', 'synthetic'], real_source=str(args.reference_tiff.resolve()),
                         transpose_for_display=transpose,
                         displayed_source_frames=source_indices.tolist(),
-                        source_planes=sorted(set(map(int, planes))), unique_donors=cells,
+                        source_planes=sorted(set(map(int, planes))), unique_donors=cells, donor_scope=donor_scope,
                         light_floor_count=int(np.count_nonzero(measured < -1)),
                         display_black_adu=black, display_white_adu=white,
                         coordination=coordination, spatial_amplitude=spatial_amplitude,
                         spatial_baseline=spatial_baseline, glare=glare, optical_layers=optical, photometry=photometry,
                         gif_validation=gif_validation,
-                        temporal_transform='Full traces are circularly shifted by the offsets in '
-                        'assignments.csv. GIF selects frames from those traces without interpolation. '
-                        'Relative light max(0, 1 + input signal) divided by each trace median.',
+                        activity_sample=str(args.activity_sample.resolve()) if args.activity_sample else None,
+                        temporal_transform=('Relative light from the supplied coordinated trace sample.'
+                                            if args.activity_sample else
+                                            'Measured traces are circularly shifted by assignments.csv. '
+                                            'Relative light max(0, 1 + input signal) divided by each trace median.'),
                         detector_noise=dict(intensity_adu=noise_levels.tolist(),
                                             sigma_adu=(noise_fraction * noise_estimates).tolist(),
                                             seed=noise_seed, scale=noise_fraction))
         (output / 'generation.json').write_text(json.dumps(metadata, indent=2) + '\n')
         output.rename(args.output)
-    print(f'Verified {gif_frames} GIF frames, {duration_ms / 1000:.1f} seconds: {args.output}', flush=True)
+    if args.calibration_only:
+        print(f'Saved optical calibration: {args.output}', flush=True)
+    else:
+        print(f'Verified {gif_frames} GIF frames, {duration_ms / 1000:.1f} seconds: {args.output}', flush=True)
 
 
 if __name__ == '__main__':

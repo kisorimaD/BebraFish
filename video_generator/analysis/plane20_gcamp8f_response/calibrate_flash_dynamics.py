@@ -115,47 +115,73 @@ def render_modulation(values, gain):
     return np.maximum(values + (gain-1) * np.maximum(values, 0), -1.)
 
 
-def calibrated_baselines(state, tone, offset):
+def dark_weights(state):
+    low, high = (state['meta'][key] for key in ('display_black_adu', 'display_white_adu'))
+    return np.clip(1 - (state['base']-low)/max(1., .18*(high-low)), 0, 1)
+
+
+def calibrated_baselines(state, tone, offset, dark_offset=0.):
     base = state['base']
     background = state['background_alone']
     calibrated = 150 + tone*(base-150) + offset
     # The diffuse baseline is the calibrated image with somata switched off.
     somas = tone*(base-background)
     diffuse = 150 + tone*(background-150) + offset
+    if dark_offset:
+        adjustment = dark_offset*dark_weights(state)
+        calibrated += adjustment
+        diffuse += adjustment
     return calibrated, somas, diffuse
 
 
-def render_flash_frame(state, index, signal, dynamic_halo, broad_change, baselines):
+def render_flash_frame(state, index, signal, dynamic_halo, broad_change, baselines,
+                       grain_correction=None):
     base, soma_base, background_base = baselines
     clean = base + signal + broad_change
     halo = state['halo_static'] + dynamic_halo
     config = state['meta']['detector_noise']
     noise, halo_noise = add_optical_noise(clean, halo, config['intensity_adu'],
                                          config['sigma_adu'], state['seeds'][index], state['halo_seeds'][index])
+    if grain_correction is not None:
+        correction = np.interp(clean, grain_correction['intensity_adu'], grain_correction['scale'])
+        noise *= correction
+        halo_noise *= correction
     synthetic = clean + noise + halo_noise
     return synthetic, soma_base + signal, background_base + broad_change + noise + halo_noise
 
 
-def replay_frame(source, activity_dir, index):
+def prepare_flash_replay(source, activity_dir):
     state = prepare_render(source)
     metadata = state['meta']
     config = json.loads((activity_dir / 'validation.json').read_text())
     with np.load(activity_dir / 'activity.npz', allow_pickle=False) as arrays:
-        if not 0 <= index < len(arrays['render_modulation']):
-            raise ValueError(f'Frame {index} is outside the saved activity.')
-        modulation = arrays['render_modulation'][index]
-        diffuse_tiles = arrays['diffuse_tile_changes'][index]
+        modulation = arrays['render_modulation']
+        diffuse_tiles = arrays['diffuse_tile_changes']
     with np.load(source / metadata.get('profile', PROFILE), allow_pickle=False) as profile:
         tissue = profile['tissue'].astype(np.float32)
     y, x = np.indices(tissue.shape, dtype=np.float32)
     coordinates = ((y + .5)/TILE-.5, (x + .5)/TILE-.5)
-    diffuse = map_coordinates(diffuse_tiles, coordinates, order=1, mode='nearest')
-    diffuse *= gaussian_filter(tissue, 12)
-    diffuse *= config['diffuse_gain']
-    activity = (modulation @ state['maps']).reshape(tissue.shape)
-    halo = halo_light(activity)
-    baselines = calibrated_baselines(state, config['static_gain'], config['static_offset_adu'])
-    return render_flash_frame(state, index, activity+halo, halo, diffuse, baselines)
+    support = gaussian_filter(tissue, 12)
+    baselines = calibrated_baselines(state, config['static_gain'], config['static_offset_adu'],
+                                    config.get('dark_offset_adu', 0.))
+
+    def render(index):
+        if not 0 <= index < len(modulation):
+            raise ValueError(f'Frame {index} is outside the saved activity.')
+        diffuse = map_coordinates(diffuse_tiles[index], coordinates, order=1, mode='nearest')
+        diffuse *= support
+        diffuse *= config['diffuse_gain']
+        activity = (modulation[index] @ state['maps']).reshape(tissue.shape)
+        halo = halo_light(activity)
+        return render_flash_frame(state, index, activity+halo, halo, diffuse, baselines,
+                                  config.get('grain_correction'))
+
+    return config, metadata, render
+
+
+def replay_frame(source, activity_dir, index):
+    _, _, render = prepare_flash_replay(source, activity_dir)
+    return render(index)
 
 
 def flash_metrics(tiles, rois, pixels, low, high):
@@ -174,7 +200,7 @@ def flash_metrics(tiles, rois, pixels, low, high):
                 pct_clipped_white=float(100 * np.mean(pixels >= high)))
 
 
-def grain_metrics(left, right, low, high):
+def grain_metrics(left, right, low, high, edges=None):
     left = left.astype(np.float32, copy=False)
     right = right.astype(np.float32, copy=False)
     median_left = np.median(left, axis=0)
@@ -183,7 +209,8 @@ def grain_metrics(left, right, low, high):
     difference = left-right
     deviation = 1.4826*np.median(np.abs(difference-np.median(difference,axis=0)),axis=0)
     valid = np.abs(median_left-median_right)<12
-    edges = [max(115,low),150,185,220,260,min(310,high)]
+    if edges is None:
+        edges = [max(115,low),150,185,220,260,min(310,high)]
     return [dict(range_adu=[a,b],pairs=int(pairs.sum()),
                  robust_sd_adu=float(np.median(deviation[pairs])) if pairs.any() else None)
             for a,b in zip(edges,edges[1:]) if b > a

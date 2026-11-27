@@ -25,13 +25,14 @@ def empirical_axes(pixels, offsets, indices, width):
     return np.asarray(shapes)
 
 
-def calibrate_profile(reference_dir, bank_path, reference_plane, output, requested_cells=None):
+def calibrate_profile(reference_dir, bank_path, reference_plane, output, requested_cells=None,
+                      include_reference_donors=False):
     median = tifffile.imread(reference_dir / 'median.tiff').astype(np.float32)
     shape = median.shape
     with np.load(bank_path) as bank:
         reference = bank['plane'] == reference_plane
         ids = bank['mask_id'][reference]
-        donors = int((~reference).sum())
+        donors = len(reference) if include_reference_donors else int((~reference).sum())
     with np.load(reference_dir / 'traces.npz') as traces:
         centers = traces['centers_yx'][ids]
         raw_baseline = np.median(traces['full_mask_F_adu'][:, ids], axis=0)
@@ -70,7 +71,7 @@ def calibrate_profile(reference_dir, bank_path, reference_plane, output, request
     normalizer *= .19 * .78 / (.65 * .36)
     cells = min(len(ids), donors, requested_cells if requested_cells is not None else len(ids))
     if cells < 100:
-        raise ValueError('Need at least 100 accepted ROI both on the reference plane and on the donor planes.')
+        raise ValueError('Need at least 100 accepted ROI both on the reference plane and in the eligible donor pool.')
     # The packing stage draws a denser set of candidates and retains those
     # whose sampled soma footprints fit in the reference support.
     packing_count = max(cells, min(cells * 4, int(support.sum() / 13)))

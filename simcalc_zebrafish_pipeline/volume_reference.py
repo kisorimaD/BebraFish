@@ -155,24 +155,26 @@ def read_reference_profile(path):
         fit = reference['median_adu'][:, :CALIBRATION_STOP_Y]
     tissue = maps.support[:, :CALIBRATION_STOP_Y] >= .8
     band = gaussian_filter(fit, (0, 3, 3)) - gaussian_filter(fit, (0, 7, 7))
-    texture_rms = .85 * float(band[tissue].std()) if tissue.any() else 0.
+    texture_rms = .45 * float(band[tissue].std()) if tissue.any() else 0.
     diameters = _diameters(annotation)
     dy, dx = meta['pixel_yx_um']
     # For uniformly sampled offsets across an ellipsoid, the median section
     # diameter is sqrt(3)/2 of its equatorial diameter before censoring.
+    diameter_xy = np.median(diameters) * np.sqrt(dy * dx) / np.sqrt(.75)
     profile = replace(Profile(), name='real18-22', shape_yx=SHAPE_YX, pixel_yx_um=(dy, dx),
                       depth_range_um=(0., 40.), acquisition=ACQUISITION,
                       depth_margin_um=27.,
-                      density_per_um3=.001566, min_center_distance_um=3.2, amplitude_adu=80.,
+                      density_per_um3=.0032, min_center_distance_um=2.45,
+                      diameter_xy_um=float(.86 * diameter_xy), diameter_z_um=6.4, amplitude_adu=38.,
                       median_style='structured', emission_model='projected',
                       texture_band_rms_adu=texture_rms,
                       background_floor_adu=float(np.percentile(fit, 2)),
-                      optics=Optics(sigma_zyx_um=(1.65, .6 * dy, .6 * dx)),
-                      diameter_xy_um=float(np.median(diameters) * np.sqrt(dy * dx) / np.sqrt(.75)))
+                      optics=Optics(sigma_zyx_um=(1.65, .6 * dy, .6 * dx)))
     meta.update(anatomy='local TIFF priors; held at end planes for optical margin',
-                morphology='XY from Plane20 polygons; axial size and absolute density are initial model values',
+                morphology='XY prior from Plane20 polygons scaled by 0.86 for smaller somas; axial size is modeled',
                 photometry='shared Plane20 baseline and structured compositors; '
-                           'global texture amplitude estimated on the upper half of the TIFF grid',
+                           'texture amplitude estimated on the upper half of the TIFF grid; '
+                           'texture darkening capped at 10% of the local envelope above the background floor',
                 density='denser placement for Plane20 appearance; absolute density remains a model value',
                 psf='Plane20 0.6 px base blur and spatially varying lateral blur; assumed axial PSF')
     return profile, maps, meta

@@ -40,8 +40,9 @@ def write_stack(output, scene, acquisition, stack, *, provenance=None):
         'units': {'length': 'µm', 'intensity': 'ADU', 'angle': 'rad'},
         'acquisition': asdict(acquisition), 'optics': asdict(stack.optics),
         'geometry_model': 'ellipsoids with full section masks',
-        'emission_model': ('Plane20 shell_patch in XY with a Gaussian axial emission profile'
-                           if profile.emission_model == 'projected' else '3D Gaussian radial shell'),
+        'emission_model': {'projected': 'Plane20 shell_patch in XY with a Gaussian axial emission profile',
+                           'ellipsoid': '3D Gaussian radial shell',
+                           'uniform-shell': '3D Gaussian radial shell with uniform surface emission'}[profile.emission_model],
         'background_model': (f'Plane20 median {profile.median_style} compositor'
                              if scene.tissue_maps is not None
                           else 'procedural diffuse field convolved with the PSF'),
@@ -75,8 +76,13 @@ def main():
     parser.add_argument('--reference', type=Path, help='Reference NPZ from volume_reference for real18-22')
     parser.add_argument('--median-style', choices=('baseline', 'structured'),
                         help='Plane20 compositor for real18-22 (default: structured)')
-    parser.add_argument('--emission-model', choices=('ellipsoid', 'projected'),
-                        help='3D radial shell or the Plane20 XY kernel with an axial emission profile')
+    parser.add_argument('--emission-model', choices=('ellipsoid', 'projected', 'uniform-shell'),
+                        help='3D shell with spatially varying or uniform surface emission, or projected XY kernel')
+    parser.add_argument('--density-per-um3', type=float, help='Override candidate soma density per cubic micrometre')
+    parser.add_argument('--min-center-distance-um', type=float, help='Override minimum distance between soma centers')
+    parser.add_argument('--diameter-xy-um', type=float, help='Override median equatorial soma diameter')
+    parser.add_argument('--shell-width', type=float, help='Override emission sigma in normalized soma radius')
+    parser.add_argument('--amplitude-adu', type=float, help='Override the mean intrinsic soma amplitude')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--n-planes', type=int)
     parser.add_argument('--z-start-um', type=float)
@@ -87,8 +93,8 @@ def main():
         parser.error('--reference is required with real18-22 and only applies to that profile')
     if args.median_style is not None and args.profile != 'real18-22':
         parser.error('--median-style only applies to real18-22')
-    if args.emission_model is not None and args.profile != 'real18-22':
-        parser.error('--emission-model only applies to real18-22')
+    if args.emission_model == 'projected' and args.profile != 'real18-22':
+        parser.error('The projected Plane20 kernel applies to real18-22')
     try:
         if args.profile == 'real18-22':
             from .volume_reference import read_reference_profile
@@ -100,6 +106,12 @@ def main():
             profile, maps, provenance = PROFILES[args.profile], None, None
         if args.emission_model is not None:
             profile = replace(profile, emission_model=args.emission_model)
+        soma_overrides = {
+            key: value for key in ('density_per_um3', 'min_center_distance_um', 'diameter_xy_um',
+                                   'shell_width', 'amplitude_adu')
+            if (value := getattr(args, key)) is not None
+        }
+        profile = replace(profile, **soma_overrides)
         defaults = profile.acquisition
         acquisition = Acquisition(
             defaults.n_planes if args.n_planes is None else args.n_planes,

@@ -107,8 +107,8 @@ class Profile:
             raise ValueError('Expected two XY spacings and two Z bounds')
         if self.median_style not in ('baseline', 'structured'):
             raise ValueError('median_style must be baseline or structured')
-        if self.emission_model not in ('ellipsoid', 'projected'):
-            raise ValueError('emission_model must be ellipsoid or projected')
+        if self.emission_model not in ('ellipsoid', 'projected', 'uniform-shell'):
+            raise ValueError('emission_model must be ellipsoid, projected or uniform-shell')
         positive = (*self.pixel_yx_um, self.depth_margin_um, self.min_center_distance_um,
                     self.diameter_xy_um, self.diameter_z_um, self.shell_peak_radius, self.shell_width)
         if (not np.isfinite(positive).all() or min(positive) <= 0
@@ -204,13 +204,18 @@ class Scene:
         mixture = 1 / (1 + np.exp(-1.5 * focus))
         distance = distance_transform_edt(np.pad(tissue, 1))[1:-1, 1:-1]
         cells = median_cell_light(cells, mixture, distance, 1., 1.)
-        background = median_background(self.background(depth, y, x), cells, profile.background_floor_adu)
+        envelope = self.background(depth, y, x)
+        background = median_background(envelope, cells, profile.background_floor_adu)
         if profile.median_style == 'baseline':
             return background + cells
         placement = map_coordinates(self.placement, coords, order=1, mode='nearest')
         amount = structured_amount(placement, tissue)
         subdued = np.clip((.65 - density) / .45, 0, 1) * support
-        texture = self.texture_at(depth) * support * (.35 + 1.8 * amount) if self.texture is not None else 0.
+        texture = 0.
+        if self.texture is not None:
+            texture = self.texture_at(depth) * support * (.35 + 1.8 * amount)
+            max_darkening = .10 * np.maximum(envelope - profile.background_floor_adu, 0.)
+            texture = np.maximum(texture, -max_darkening)
         return structured_layer(background, cells, amount, texture, subdued, .30, .78,
                                 profile.background_floor_adu)
 
@@ -270,6 +275,10 @@ def sample_scene(profile: Profile, seed: int, *, tissue_maps: TissueMaps | None 
     cells['shell_width'] = profile.shell_width
     cells['angular_coefficients'] = .5 * sample_angular_coefficients(count, rng)
     cells['axial_coefficients'] = rng.normal(0, .22, (count, 2))
+    if profile.emission_model == 'uniform-shell':
+        # Keep field and amplitude seeds paired across emission models.
+        cells['angular_coefficients'] = 0.
+        cells['axial_coefficients'] = 0.
     cells.flags.writeable = phases.flags.writeable = False
     texture = _sample_texture(profile, rng) if profile.texture_band_rms_adu > 0 else None
     focus = placement = None
@@ -325,7 +334,7 @@ def _projected_light(cell, relative_z, xy_um, sigma_yx, offsets, weights, signal
         peaks[k] = contribution.max()
 
 
-def _soma_patch(cell, z, xy_um, shape, optics, offsets, weights, signal, peaks, *, projected):
+def _soma_patch(cell, z, xy_um, shape, optics, offsets, weights, signal, peaks, *, emission_model):
     cz, cy, cx = cell['center_zyx_um']
     az, ay, ax = cell['semiaxes_zyx_um']
     peak, width = cell['shell_peak_radius'], cell['shell_width']
@@ -354,28 +363,31 @@ def _soma_patch(cell, z, xy_um, shape, optics, offsets, weights, signal, peaks, 
     for k in np.flatnonzero(np.abs(h) <= 1):
         iy, ix = np.nonzero(radial_xy2[inner] + h[k]**2 <= 1)
         voxel_parts.append(((k * height + ys.start + iy) * width_px + xs.start + ix).astype(np.int64))
-    if projected:
+    if emission_model == 'projected':
         _projected_light(cell, z - cz, xy_um, (sy, sx), offsets, weights, signal, peaks)
         return voxel_parts
 
     radial_xy = np.sqrt(radial_xy2)
-    log_gain = arc_log_gain(u, v, ax, ay, cell['angular_coefficients'])
-    if not np.any(log_gain):
-        flux_scale = 1.
-    else:
-        equatorial = gaussian_shell(radial_xy, peak, width)
-        flux_scale = equatorial.sum() / max(float(np.sum(equatorial * np.exp(log_gain))), 1e-300)
+    uniform = emission_model == 'uniform-shell'
+    flux_scale = 1.
+    if not uniform:
+        log_gain = arc_log_gain(u, v, ax, ay, cell['angular_coefficients'])
+        if np.any(log_gain):
+            equatorial = gaussian_shell(radial_xy, peak, width)
+            flux_scale = equatorial.sum() / max(float(np.sum(equatorial * np.exp(log_gain))), 1e-300)
     linear, quadratic = cell['axial_coefficients']
     for k in np.flatnonzero(np.abs(z - cz) <= az * cutoff + offsets[-1]):
         w = ((z[k] - cz + offsets) / az)[:, None, None]
         rho = np.sqrt(radial_xy2 + w**2)
         shell = gaussian_shell(rho, peak, width)
-        safe_rho = np.maximum(rho, 1e-6)
-        direction_z = w / safe_rho
-        pattern = linear * direction_z + quadratic * (direction_z**2 - 1/3)
-        # Use the same equatorial arcs as Plane20 and fade them at the poles.
-        pattern += log_gain * (radial_xy / safe_rho)**2
-        axial = np.einsum('i,ijk->jk', weights, np.where(rho <= cutoff, shell * np.exp(pattern), 0))
+        if not uniform:
+            safe_rho = np.maximum(rho, 1e-6)
+            direction_z = w / safe_rho
+            pattern = linear * direction_z + quadratic * (direction_z**2 - 1/3)
+            # Use the same equatorial arcs as Plane20 and fade them at the poles.
+            pattern += log_gain * (radial_xy / safe_rho)**2
+            shell *= np.exp(pattern)
+        axial = np.einsum('i,ijk->jk', weights, np.where(rho <= cutoff, shell, 0))
         blurred = gaussian_filter(axial, (sy / dy, sx / dx), mode='constant')
         contribution = (cell['amplitude_adu'] * flux_scale * blurred[inner]).astype(np.float32)
         signal[k, ys, xs] += contribution
@@ -410,7 +422,7 @@ def render_stack(scene: Scene, acquisition: Acquisition | None = None, *, optics
     parts = []
     for i, cell in enumerate(scene.cells):
         voxels = _soma_patch(cell, z, p.pixel_yx_um, p.shape_yx, optics, offsets, weights, signal, peaks[i],
-                            projected=projected)
+                            emission_model=p.emission_model)
         parts.extend(voxels)
         instance_offsets[i + 1] = instance_offsets[i] + sum(len(part) for part in voxels)
     for k, depth in enumerate(z):

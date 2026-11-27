@@ -47,6 +47,14 @@ def gaussian_shell(radius, peak_radius, width):
     return np.exp(-.5 * ((radius - peak_radius) / width)**2)
 
 
+def modulate_shell(shell, log_gain):
+    """Redistribute shell intensity along the outline while preserving its sum."""
+    gain = np.exp(log_gain - log_gain.max())
+    modulated = shell * gain
+    modulated *= shell.sum() / max(modulated.sum(), 1e-300)
+    return modulated
+
+
 def arc_log_gain(u, v, major, minor, coefficients):
     """Evaluate the Plane20 brightness harmonics at equal ellipse arc length."""
     phi = np.mod(np.arctan2(v, u), 2 * np.pi)
@@ -84,11 +92,7 @@ def shell_patch(center_yx,major,minor,angle_deg,ring,fill,blur,*,peak_radius=1.,
             raise ValueError('Angular coefficients must be a finite K by 2 array')
         if np.any(coefficients):
             log_gain=arc_log_gain((x*c+y*s)/(major/2),(-x*s+y*c)/(minor/2),major,minor,coefficients)
-            # Log subtraction avoids overflow and is cancelled by normalization.
-            gain=np.exp(log_gain-log_gain.max())
-            # Renormalize shell alone, keeping an optional core component fixed.
-            modulated_shell=shell*gain
-            modulated_shell*=shell.sum()/max(modulated_shell.sum(),1e-300)
+            modulated_shell=modulate_shell(shell,log_gain)
             kernel=(1-fill)*modulated_shell+fill*core
     kernel=gaussian_filter(kernel,blur,mode='constant')
     return origin,kernel.astype(np.float32),rho<=1

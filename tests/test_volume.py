@@ -106,6 +106,25 @@ class VolumeTest(unittest.TestCase):
             self.assertEqual(image.shape, (1, 32, 32))
             np.testing.assert_array_equal(single_gt['z_positions_um'], [4.])
 
+    def test_uniform_shell_has_symmetric_light_beyond_both_poles(self):
+        profile = replace(PROFILES['demo'], shape_yx=(40, 40), emission_model='uniform-shell')
+        sampled = sample_scene(profile, 42)
+        self.assertTrue(np.all(sampled.cells['angular_coefficients'] == 0.))
+        self.assertTrue(np.all(sampled.cells['axial_coefficients'] == 0.))
+        cells = sampled.cells[:1].copy()
+        cells['center_zyx_um'] = (20., 10., 10.)
+        cells['semiaxes_zyx_um'] = (2., 2., 3.)
+        scene = replace(sampled, cells=cells)
+        acquisition = Acquisition(3, 17., 3.)
+        uniform = render_stack(scene, acquisition)
+        unmodulated = render_stack(replace(scene, profile=replace(profile, emission_model='ellipsoid')),
+                                   acquisition)
+        np.testing.assert_allclose(uniform.clean_adu, unmodulated.clean_adu, atol=1e-5, rtol=0.)
+        np.testing.assert_allclose(uniform.cell_peak_adu[0, 0], uniform.cell_peak_adu[0, 2])
+        self.assertGreater(uniform.cell_peak_adu[0, 0], 0.)
+        planes = uniform.instance_voxel_index // np.prod(profile.shape_yx)
+        np.testing.assert_array_equal(np.unique(planes), [1])
+
     def test_invalid_acquisition_and_shape(self):
         scene = sample_scene(PROFILES['demo'], 2)
         for acquisition in (Acquisition(0), Acquisition(5, 0., 0.), Acquisition(1, float('nan')),
@@ -139,3 +158,15 @@ class VolumeTest(unittest.TestCase):
         self.assertGreater(float(np.std(coarse.clean_adu - ellipsoid.clean_adu)), 1.)
         no_texture = render_stack(replace(scene, texture=None), Acquisition(5))
         self.assertGreater(float(np.std(coarse.clean_adu - no_texture.clean_adu)), 1.)
+
+    def test_diffuse_texture_cannot_erase_local_background(self):
+        profile = replace(PROFILES['demo'], shape_yx=(8, 8), density_per_um3=0.,
+                          background_floor_adu=100., median_style='structured')
+        depths = Acquisition(5).depths()
+        support = np.ones((len(depths), *profile.shape_yx), dtype=np.float32)
+        envelope = np.broadcast_to(np.linspace(110., 180., 8, dtype=np.float32), support.shape)
+        maps = TissueMaps(depths, support, support, envelope)
+        scene = sample_scene(profile, 42, tissue_maps=maps)
+        scene = replace(scene, texture=np.full((9, 8, 8), -1000., dtype=np.float32))
+        image = render_stack(scene, Acquisition(1, 20.)).clean_adu[0]
+        np.testing.assert_array_equal(image, envelope[2] - .10 * (envelope[2] - 100.))

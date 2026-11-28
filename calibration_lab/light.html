@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BebraFish · Настройка свечения</title>
+  <link rel="stylesheet" href="/light.css">
+  <script type="module" src="/light.js"></script>
+</head>
+<body>
+<main>
+  <header><a href="/">BebraFish</a><h1>Настройка свечения сом</h1></header>
+  <p id="status" role="status">Загружаем сцену…</p>
+  <div id="workspace" hidden>
+    <aside>
+      <section>
+        <h2>Область сравнения</h2>
+        <label>Кроп <select id="crop"></select></label>
+        <div class="map" id="map">
+          <img id="overview" alt="Референс целиком">
+          <div id="rectangle" aria-hidden="true"></div>
+        </div>
+        <p class="hint">Кликните по референсу или задайте координаты.</p>
+        <div class="coordinates">
+          <label>X <input id="x" type="number" min="0" step="1"></label>
+          <label>Y <input id="y" type="number" min="0" step="1"></label>
+          <label>Размер <select id="size"><option>64</option><option selected>96</option><option>128</option><option>192</option></select></label>
+        </div>
+      </section>
+      <section>
+        <h2>Параметры рендера</h2>
+        <div id="controls"></div>
+        <label id="noise-label"><input id="noise" type="checkbox"> Показать зерно сохранённой сцены</label>
+        <div class="actions">
+          <button id="reset" type="button">Сбросить</button>
+          <button id="apply" type="button" hidden>Сгенерировать с этим светом</button>
+          <button id="save" type="button">Скачать настройки</button>
+        </div>
+      </section>
+    </aside>
+    <div class="results">
+      <section>
+        <h2>Сравнение на одной шкале яркости</h2>
+        <div class="triptych">
+          <figure><figcaption>Референс</figcaption><img id="real" alt="Реальный кроп"></figure>
+          <figure><figcaption>Исходный рендер</figcaption><img id="baseline" alt="Кроп исходного рендера"></figure>
+          <figure><figcaption>Текущая настройка</figcaption><img id="changed" alt="Кроп с изменённым свечением"></figure>
+        </div>
+      </section>
+      <section>
+        <h2>Свечение от центра к краю</h2>
+        <div class="legend"><span>Референс</span><span>Исходный рендер</span><span>Текущая настройка</span></div>
+        <canvas id="chart" width="800" height="260" role="img"
+          aria-label="Медианный сигнал над центром в зависимости от относительного радиуса сомы"></canvas>
+        <p class="hint" id="profile-note"></p>
+        <table>
+          <thead><tr><th scope="col">Метрика</th><th scope="col">Референс</th><th scope="col">Исходный</th><th scope="col">Текущий</th></tr></thead>
+          <tbody id="metrics"></tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+</main>
+</body>
+</html>

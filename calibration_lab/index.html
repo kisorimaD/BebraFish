@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>BebraFish · 2D-синтетика</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+<main>
+  <header><h1>2D-синтетика zebrafish</h1><p>Калибровка по медианному изображению</p></header>
+  <div class="line">
+    <label>Проект <select id="projects"><option value="">Выберите проект</option></select></label>
+    <button id="choose" type="button">Выбрать TIFF…</button>
+    <input id="file" type="file" accept=".tif,.tiff,image/tiff" hidden>
+  </div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <section id="workflow" hidden>
+    <nav aria-label="Этапы">
+      <button type="button" data-step="soma">1. Контуры</button>
+      <button type="button" data-step="region">2. Фон</button>
+      <button type="button" data-step="centers">3. Центры</button>
+      <button type="button" data-step="generate">4. Генерация</button>
+    </nav>
+    <div id="soma" hidden>
+      <p>Обведите около 20 полных сом по внешнему видимому краю. Дождитесь подтверждения сохранения.</p>
+      <iframe title="Разметка контуров сом"></iframe>
+    </div>
+    <div id="region" hidden>
+      <p>Отметьте области без сом заливкой и дождитесь сохранения. Порог применяется к медианному изображению.</p>
+      <iframe title="Разметка областей без сом"></iframe>
+    </div>
+    <div id="centers" hidden>
+      <p>Выберите несколько кропов из списка и отметьте все различимые центры. Повторный клик рядом с точкой удаляет её.</p>
+      <div class="line">
+        <label>Кроп <select id="crop"></select></label>
+        <label><input id="reviewed" type="checkbox"> Кроп просмотрен полностью</label>
+      </div>
+      <canvas id="image" aria-label="Кроп для разметки центров"></canvas>
+      <p id="marked" aria-live="polite"></p>
+    </div>
+    <div id="generate" hidden>
+      <form id="run">
+        <div class="line">
+          <label>Число сцен <input id="count" type="number" min="1" max="256" value="8" required></label>
+          <label>Seed <input id="seed" type="number" min="0" max="4294967295" value="20261124" required></label>
+          <label><input id="grow-somas" type="checkbox"> Рост сом до контакта</label>
+          <button>Настроить и сгенерировать</button>
+        </div>
+      </form>
+      <p id="result" hidden></p>
+      <p id="baseline-links" hidden></p>
+      <details id="metrics" hidden>
+        <summary>Графики сравнения с реальной медианой</summary>
+        <p>Графики сравнивают рабочую медиану с базовым и структурированным
+          рендерами. Для плотности и расстояний сопоставляются видимые
+          размеченные и все нарисованные центры. Полосы показывают
+          межквартильный размах.</p>
+        <p id="metrics-status" role="status"></p>
+        <a id="metrics-link" download="metrics.png">Скачать графики PNG</a>
+        <img id="metrics-image" class="preview" loading="lazy"
+          alt="Сравнение фона, контраста, профилей сом, плотности и пространственных связей">
+      </details>
+      <section id="comparison" hidden aria-labelledby="comparison-title">
+        <div class="line comparison-header">
+          <h2 id="comparison-title">Реальная медиана и синтетика</h2>
+          <label><input id="p5-p95" type="checkbox"> Нормировка P5–P95</label>
+        </div>
+        <p id="contrast-description"></p>
+        <div class="comparison-columns" aria-hidden="true">
+          <span>Реальная медиана</span><span>Синтетика, сцена 1</span>
+        </div>
+        <img id="scene-preview" class="preview" alt="Полная реальная медиана слева и первая синтетическая сцена справа">
+        <h3>Кропы из тех же областей</h3>
+        <div class="crop-preview">
+          <div class="comparison-columns" aria-hidden="true">
+            <span>Реальный кроп</span><span>Синтетический кроп</span>
+          </div>
+          <img id="crops-preview" class="preview" alt="Пары кропов с одинаковыми координатами, реальные слева, синтетические справа">
+        </div>
+      </section>
+    </div>
+  </section>
+</main>
+</body>
+</html>

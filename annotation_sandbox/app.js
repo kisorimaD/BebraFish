@@ -15,7 +15,7 @@ async function save(){
   if(saving)return;
   saving=true;pending=false;const sent=revision;
   try{
-    const res=await fetch('/api/annotations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(exportDoc())});
+    const res=await fetch('api/annotations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(exportDoc())});
     if(!res.ok)throw Error(await res.text());const result=await res.json();
     if(revision===sent)$('saveState').textContent='✓ Сохранено на диск';
     $('saveState').title=result.path;error('');
@@ -117,7 +117,7 @@ new ResizeObserver(()=>{const r=$('stage').getBoundingClientRect();W=r.width;H=r
 async function init(){try{
  meta=await (await fetch('assets/dataset.json')).json();const buf=await(await fetch('assets/frame.bin')).arrayBuffer();if(buf.byteLength!==meta.shape_yx[0]*meta.shape_yx[1]*2)throw Error('Размер кадра не совпадает с метаданными');const dv=new DataView(buf);raw=new Uint16Array(buf.byteLength/2);for(let i=0;i<raw.length;i++)raw[i]=dv.getUint16(i*2,true);
  storageKey='soma-lab:'+meta.frame_sha256+':'+meta.frame_index;
- const saved=await fetch('/api/annotations');if(!saved.ok)throw Error('Не удалось прочитать локальную разметку');doc=await saved.json();let browserCopy;try{browserCopy=JSON.parse(localStorage.getItem(storageKey)||'null')}catch{}
+ const saved=await fetch('api/annotations');if(!saved.ok)throw Error('Не удалось прочитать локальную разметку');doc=await saved.json();let browserCopy;try{browserCopy=JSON.parse(localStorage.getItem(storageKey)||'null')}catch{}
  if(browserCopy){try{validateImport(browserCopy);if((browserCopy.updated_at||'')>(doc.updated_at||'')){doc=browserCopy;pending=true;status('Восстановлена более новая копия из браузера.')}}catch{}}
  validateImport(doc);current=(doc.crops[2]||doc.crops[0]).id;black=meta.display_range[0];white=meta.display_range[1];$('source').textContent=`${meta.source_name} · кадр ${meta.frame_index} (с нуля) · ${meta.shape_yx[0]}×${meta.shape_yx[1]} px`;$('saveState').textContent='✓ Локальная разметка';setContrast(black,white);renderUI();status('Готово. Обведите всю сому, включая тёмный центр. Изменения сохраняются автоматически.');if(pending)save();
  }catch(e){error('Не удалось открыть песочницу: '+e.message+'. Запустите python tools/annotate_somas.py из репозитория.');status('Ошибка загрузки')}

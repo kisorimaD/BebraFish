@@ -56,13 +56,13 @@ def polygon_mask(shape,polygon):
     return inside|boundary
 
 
-def prepare(input_path,annotation_dir):
+def prepare(input_path,annotation_dir, *, web_dir=None):
     image=load_image(input_path);payload=image.tobytes()
     meta=dict(source_path=str(input_path.resolve()),source_name=input_path.name,
         shape_yx=list(image.shape),image_sha256=hashlib.sha256(payload).hexdigest(),dtype='float32',byte_order='little',
         intensity_range_adu=[float(image.min()),float(image.max())],
         display_range=np.percentile(image,[1,99.5]).astype(float).tolist())
-    assets=WEB/'assets';assets.mkdir(exist_ok=True)
+    assets=(WEB if web_dir is None else web_dir)/'assets';assets.mkdir(exist_ok=True)
     (assets/'image.bin').write_bytes(payload);(assets/'dataset.json').write_text(json.dumps(meta,indent=2)+'\n')
     annotation_dir.mkdir(parents=True,exist_ok=True)
     target=annotation_dir/f'regions_{input_path.stem}_{meta["image_sha256"][:12]}.json'

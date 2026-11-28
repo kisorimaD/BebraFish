@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT/'annotation_sandbox'
 
 
-def prepare(input_path, frame_index, annotation_dir):
+def prepare(input_path, frame_index, annotation_dir, *, web_dir=None):
     with tifffile.TiffFile(input_path) as tif:
         if not 0 <= frame_index < len(tif.pages):
             raise ValueError(f'Frame index outside 0..{len(tif.pages)-1}')
@@ -32,7 +32,7 @@ def prepare(input_path, frame_index, annotation_dir):
                 frame_index=frame_index, frame_count=frame_count, shape_yx=[h, w],
                 frame_sha256=digest, dtype='uint16', byte_order='little', pixel_size_um=None,
                 display_range=np.percentile(frame, [1, 99.5]).round().astype(int).tolist())
-    assets = WEB/'assets'; assets.mkdir(exist_ok=True)
+    assets = (WEB if web_dir is None else web_dir)/'assets'; assets.mkdir(exist_ok=True)
     (assets/'frame.bin').write_bytes(data)
     (assets/'dataset.json').write_text(json.dumps(meta, indent=2)+'\n')
     crops = []

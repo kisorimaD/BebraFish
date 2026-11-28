@@ -43,17 +43,30 @@ def angular_log_modulation(phase,coefficients):
     return value
 
 
-def shell_patch(center_yx,major,minor,angle_deg,ring,fill,blur,*,peak_radius=1.,width=.1,angular_coefficients=None):
+def shell_patch_radius(major, peak_radius, width, blur, *, scale_max=None):
+    extent = peak_radius + 4*width
+    if scale_max is not None:
+        extent = np.maximum(1.1, extent*scale_max)
+    return np.ceil(major/2*extent + 3*blur).astype(int) + 2
+
+
+def shell_patch(center_yx,major,minor,angle_deg,ring,fill,blur,*,peak_radius=1.,width=.1,angular_coefficients=None, radial_scale=None):
     """Gaussian shell in elliptical radius rho; rho=1 is annotation mid-shell.
 
     width is pre-blur Gaussian sigma in normalized radius, not physical wall
     thickness. PSF, sampling and neighbors alter measured apparent width.
     """
     theta=np.radians(angle_deg);c,s=np.cos(theta),np.sin(theta)
-    radius=int(np.ceil(major/2*(peak_radius+4*width)+3*blur))+2
+    scale_max = None if radial_scale is None else np.max(radial_scale)
+    radius = shell_patch_radius(major, peak_radius, width, blur, scale_max=scale_max)
     origin=np.floor(center_yx).astype(int)-radius;side=2*radius+1
     y,x=np.mgrid[:side,:side].astype(float);y-=center_yx[0]-origin[0];x-=center_yx[1]-origin[1]
     rho=np.sqrt(((x*c+y*s)/(major/2))**2+((-x*s+y*c)/(minor/2))**2)
+    phi = None
+    if radial_scale is not None:
+        phi = np.mod(np.arctan2((-x*s+y*c)/(minor/2), (x*c+y*s)/(major/2)), 2*np.pi)
+        angles = np.arange(len(radial_scale))*2*np.pi/len(radial_scale)
+        rho = rho / np.interp(phi, angles, radial_scale, period=2*np.pi)
     shell=np.exp(-.5*((rho-peak_radius)/width)**2)
     core=np.exp(-(rho/max(.7*peak_radius,1e-5))**8)
     kernel=(1-fill)*shell+fill*core
@@ -64,7 +77,8 @@ def shell_patch(center_yx,major,minor,angle_deg,ring,fill,blur,*,peak_radius=1.,
         if np.any(coefficients):
             # Convert ellipse parameter to equal arc-length phase, so bright
             # arcs have comparable physical lengths around an elongated soma.
-            phi=np.mod(np.arctan2((-x*s+y*c)/(minor/2),(x*c+y*s)/(major/2)),2*np.pi)
+            if phi is None:
+                phi=np.mod(np.arctan2((-x*s+y*c)/(minor/2),(x*c+y*s)/(major/2)),2*np.pi)
             grid=np.linspace(0,2*np.pi,1025)
             speed=np.hypot(major*np.sin(grid),minor*np.cos(grid))
             arc=np.r_[0,np.cumsum((speed[:-1]+speed[1:])/2*np.diff(grid))]
@@ -81,7 +95,7 @@ def shell_patch(center_yx,major,minor,angle_deg,ring,fill,blur,*,peak_radius=1.,
 
 
 def radial_profiles(image, centers_yx, major, minor, angles_deg, radii=None, n_angles=64,
-                    coordinate_offset=0.):
+                    coordinate_offset=0., *, return_samples=False):
     """Angular median at each normalized elliptical radius.
 
     offset=.5 for pixel-edge annotation coordinates, 0 for generator centers
@@ -96,7 +110,7 @@ def radial_profiles(image, centers_yx, major, minor, angles_deg, radii=None, n_a
     x=np.asarray(centers_yx)[:,1,None,None]+u*np.cos(angle)-v*np.sin(angle)-coordinate_offset
     y=np.asarray(centers_yx)[:,0,None,None]+u*np.sin(angle)+v*np.cos(angle)-coordinate_offset
     sampled=map_coordinates(np.asarray(image,dtype=float),[y.ravel(),x.ravel()],order=1,mode='nearest').reshape(x.shape)
-    return radii,np.median(sampled,axis=2)
+    return radii, sampled if return_samples else np.median(sampled,axis=2)
 
 
 def normalize_profiles(r, curves):

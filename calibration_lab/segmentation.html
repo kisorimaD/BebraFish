@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Постобработка масок U-Net</title>
+  <link rel="stylesheet" href="/segmentation.css">
+  <script type="module" src="/segmentation.js"></script>
+</head>
+<body>
+  <aside>
+    <a href="/">Калибровка</a>
+    <h1>Постобработка масок U-Net</h1>
+    <details><summary>Чекпойнт и сцена</summary><p id="source"></p></details>
+    <p role="status" id="status">Загрузка кандидатов…</p>
+    <fieldset disabled>
+      <label>Порог центра <output></output><input id="threshold" type="range" min="0.05" max="1" step="0.005" value="0.30"></label>
+      <label>Радиус соседства, px <output></output><input id="radius" type="range" min="1" max="50" step="1" value="12"></label>
+      <label>Бонус за соседа (до двух) <output></output><input id="bonus" type="range" min="0" max="0.30" step="0.005" value="0"></label>
+      <label>Штраф за изоляцию <output></output><input id="penalty" type="range" min="0" max="0.30" step="0.005" value="0"></label>
+      <label>Предел покрытия кандидата <output></output><input id="maxCover" type="range" min="0.05" max="1" step="0.01" value="0.85"></label>
+      <label>Масштаб <output></output><input id="zoom" type="range" min="0.5" max="6" step="0.5" value="1"></label>
+      <div class="layers">
+        <label class="original"><input type="checkbox" id="original" checked> Исходные <span></span></label>
+        <label class="added"><input type="checkbox" id="added" checked> Добавленные <span></span></label>
+        <label class="removed"><input type="checkbox" id="removed"> Снятые <span></span></label>
+      </div>
+      <button type="button" id="reset">Сбросить настройки</button>
+    </fieldset>
+  </aside>
+  <main aria-label="Изображение сцены с контурами масок">
+    <canvas hidden></canvas>
+  </main>
+</body>
+</html>

@@ -9,7 +9,7 @@
 </head>
 <body>
 <main>
-  <header><h1>2D-синтетика zebrafish</h1><p>Калибровка по медианному изображению</p></header>
+  <header><h1>2D-синтетика zebrafish</h1><p>Калибровка по медианному изображению</p><a href="/segmentation">Постобработка масок U-Net</a></header>
   <div class="line">
     <label>Проект <select id="projects"><option value="">Выберите проект</option></select></label>
     <button id="choose" type="button">Выбрать TIFF…</button>
@@ -22,6 +22,7 @@
       <button type="button" data-step="region">2. Фон</button>
       <button type="button" data-step="centers">3. Центры</button>
       <button type="button" data-step="generate">4. Генерация</button>
+      <button type="button" data-step="refinement">5. Доразметка</button>
     </nav>
     <div id="soma" hidden>
       <p>Обведите около 20 полных сом по внешнему видимому краю. Дождитесь подтверждения сохранения.</p>
@@ -35,10 +36,25 @@
       <p>Выберите несколько кропов из списка и отметьте все различимые центры. Повторный клик рядом с точкой удаляет её.</p>
       <div class="line">
         <label>Кроп <select id="crop"></select></label>
+        <label><input id="holdout" type="checkbox"> Кроп для оценки</label>
         <label><input id="reviewed" type="checkbox"> Кроп просмотрен полностью</label>
       </div>
       <canvas id="image" aria-label="Кроп для разметки центров"></canvas>
       <p id="marked" aria-live="polite"></p>
+    </div>
+    <div id="refinement" hidden>
+      <p>Обучите модель на синтетике завершённого прогона или откройте готовые предсказания по рабочей медиане.</p>
+      <div class="line">
+        <button id="train-review" type="button">Обучить и предложить контуры</button>
+        <form id="import-review" class="line">
+          <label>Путь к instances.npz <input id="prediction-path" required></label>
+          <button>Открыть</button>
+        </form>
+        <a id="training-log" hidden>Журнал обучения</a>
+      </div>
+      <p id="review-status" role="status"></p>
+      <p id="review-help" hidden>Подтвердите подходящие контуры, поправьте границы и дорисуйте пропущенные сомы. Отмечайте кроп просмотренным после проверки всего участка.</p>
+      <iframe title="Проверка предложенных контуров" hidden></iframe>
     </div>
     <div id="generate" hidden>
       <form id="run">

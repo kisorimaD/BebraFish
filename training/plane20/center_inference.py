@@ -113,6 +113,69 @@ def evaluate(args, restore=None):
     return report
 
 
+def image_candidates(model, image, threshold, mask_threshold, restore=None):
+    h, w = image.shape;padded = np.pad(image, ((16, 144), (16, 144)), mode='reflect')
+    points, scores, origins, masks = [], [], [], []
+    for y in range(0, h, 96):
+        for x in range(0, w, 96):
+            tile = padded[y:y+128, x:x+128]
+            if restore is not None:
+                tile = restore(tile)
+            p = patch_prediction(model, normalize(tile), threshold)
+            for point, score, origin, probability in zip(p['centers'], p['scores'], p['origins'], p['probabilities']):
+                point = point+[y-16, x-16]
+                if not np.all((point >= 0) & (point < [h, w])):
+                    continue
+                origin = origin+[y-16, x-16];mask = probability >= mask_threshold
+                start, stop = np.maximum(origin, 0), np.minimum(origin+mask.shape, [h, w])
+                if not np.all(stop > start) or not mask[start[0]-origin[0]:stop[0]-origin[0], start[1]-origin[1]:stop[1]-origin[1]].any():
+                    continue
+                points.append(point);scores.append(score);origins.append(origin);masks.append(mask)
+    points = np.asarray(points, np.float32).reshape(-1, 2);scores = np.asarray(scores, np.float32)
+    suppressed = set()
+    if len(points):
+        neighbors = cKDTree(points).query_ball_point(points, 1.)
+        for i in np.argsort(-scores):
+            if i in suppressed:
+                continue
+            for j in neighbors[i]:
+                if i != j and scores[j] <= scores[i]:
+                    suppressed.add(j)
+    keep = [i for i in range(len(points)) if i not in suppressed]
+    return points, scores, origins, masks, keep
+
+
+def write_candidate_preview(args, image, page, points, scores, origins, masks, keep):
+    from PIL import Image
+    from skimage.measure import find_contours
+
+    h, w = image.shape
+    lo, hi = np.percentile(image, (5, 95))
+    display = np.clip((image.astype(np.float32) - lo) / max(hi - lo, 1e-6), 0, 1)
+    Image.fromarray((display * 255).astype(np.uint8)).save(args.output / 'scene.png')
+    candidates = []
+    for i in keep:
+        y, x = origins[i]
+        y0, x0 = max(y, 0), max(x, 0)
+        clipped = masks[i][y0-y:h-y, x0-x:w-x]
+        # Runs are [flat start, length] in the image. Contours use pixel edges.
+        rows, starts = np.nonzero(clipped & ~np.pad(clipped[:, :-1], ((0, 0), (1, 0))))
+        _, ends = np.nonzero(clipped & ~np.pad(clipped[:, 1:], ((0, 0), (0, 1))))
+        runs = np.column_stack(((rows + y0) * w + starts + x0, ends - starts + 1))
+        contours = [
+            (loop[:, ::-1] + [x0 - .5, y0 - .5]).tolist()
+            for loop in find_contours(np.pad(clipped, 1), .5)
+        ]
+        candidates.append(dict(center=(points[i][::-1] + .5).tolist(),
+                               score=float(scores[i]), runs=runs.tolist(), contours=contours))
+    metadata = dict(width=w, height=h, image=str(args.image), page=page,
+                    checkpoint=str(args.run / 'weights_best.h5'),
+                    checkpoint_sha256=hashlib.sha256((args.run / 'weights_best.h5').read_bytes()).hexdigest(),
+                    candidate_floor=args.threshold, mask_threshold=args.mask_threshold,
+                    denoiser=str(args.denoiser) if args.denoiser else None, candidates=candidates)
+    (args.output / 'candidates.json').write_text(json.dumps(metadata, separators=(',', ':')))
+
+
 def predict(args):
     denoiser_path = getattr(args, 'denoiser', None)
     denoiser_sha256 = None
@@ -132,34 +195,13 @@ def predict(args):
     with tifffile.TiffFile(args.image) as tif:
         input_page = args.frame if len(tif.pages) > 1 else 0
         image = tif.pages[input_page].asarray()
-    h, w = image.shape;padded = np.pad(image, ((16, 144), (16, 144)), mode='reflect')
-    points, scores, origins, masks = [], [], [], []
-    for y in range(0, h, 96):
-        for x in range(0, w, 96):
-            tile = padded[y:y+128, x:x+128]
-            if denoiser_path:
-                tile = restore_batch(denoiser, tile[None])[0]
-            p = patch_prediction(model, normalize(tile), args.threshold)
-            for point, score, origin, probability in zip(p['centers'], p['scores'], p['origins'], p['probabilities']):
-                point = point+[y-16, x-16]
-                if not np.all((point >= 0) & (point < [h, w])):
-                    continue
-                origin = origin+[y-16, x-16];mask = probability >= args.mask_threshold
-                start, stop = np.maximum(origin, 0), np.minimum(origin+mask.shape, [h, w])
-                if not np.all(stop > start) or not mask[start[0]-origin[0]:stop[0]-origin[0], start[1]-origin[1]:stop[1]-origin[1]].any():
-                    continue
-                points.append(point);scores.append(score);origins.append(origin);masks.append(mask)
-    points = np.asarray(points, np.float32).reshape(-1, 2);scores = np.asarray(scores, np.float32)
-    suppressed = set()
-    if len(points):
-        neighbors = cKDTree(points).query_ball_point(points, 1.)
-        for i in np.argsort(-scores):
-            if i in suppressed:
-                continue
-            for j in neighbors[i]:
-                if i != j and scores[j] <= scores[i]:
-                    suppressed.add(j)
-    keep = [i for i in range(len(points)) if i not in suppressed]
+    restore = (lambda tile: restore_batch(denoiser, tile[None])[0]) if denoiser_path else None
+    points, scores, origins, masks, keep = image_candidates(
+        model, image, args.threshold, args.mask_threshold, restore)
+    h, w = image.shape
+    if getattr(args, 'preview_candidates', False):
+        write_candidate_preview(args, image, input_page, points, scores, origins, masks, keep)
+        return
     pixels, offsets = [], [0];preview = np.zeros((h, w), np.uint32)
     import matplotlib
     matplotlib.use('Agg')
@@ -196,9 +238,13 @@ def main():
             q.add_argument('--data', type=Path, required=True);q.add_argument('--split', choices=['train', 'val', 'test'], default='val')
             q.add_argument('--crops', type=int, default=24);q.add_argument('--start-index', type=int, default=32);q.add_argument('--seed', type=int, default=991)
         else:
+            q.add_argument('--preview-candidates', action='store_true', default=argparse.SUPPRESS,
+                           help='Export a browser preview bundle at the specified candidate threshold')
             q.add_argument('--image', type=Path, required=True);q.add_argument('--frame', type=int, default=500)
             q.add_argument('--denoiser', type=Path, help='Optional denoiser weights, applied tile by tile before normalization')
     args = p.parse_args()
+    if getattr(args, 'preview_candidates', False) and not 0 < args.threshold <= 1:
+        p.error('--threshold for candidate export must be in (0, 1]')
     (evaluate if args.command == 'evaluate' else predict)(args)
 
 

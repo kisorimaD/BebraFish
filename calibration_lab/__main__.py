@@ -23,11 +23,13 @@ from training.plane20.generate_median import generate_pair, relight_pair
 import annotate_somas
 import annotate_regions
 from .preview import PREVIEW_NAMES, comparison_previews
-from .metrics import write_metrics
+from .metrics import write_heldout_metrics, write_metrics
 from .light import arrays, open_manifest, open_run
+from .refinement import intersects, prepare_review, refinement_input, train_and_predict
 
 WEB = Path(__file__).resolve().parent
 METRICS_LOCK = threading.Lock()
+TRAINING_LOCK = threading.Lock()
 METRICS_MTIME = max((WEB/name).stat().st_mtime for name in ('metrics.py', 'spatial_metrics.py'))
 OUTPUT = ROOT/'outputs/calibration_lab'
 ASSETS = {
@@ -66,17 +68,45 @@ def prepare_job(folder, source, *, source_name=None):
     write_json(folder/'source.json', metadata)
 
 
-def generation(folder, attempt, crops, count, seed, update, *, grow_somas=False):
+def generation(folder, attempt, crops, count, seed, update, *, soma=None, review=None, heldout=(), grow_somas=False):
     image = tifffile.imread(folder/'reference.tiff')
     profile = attempt/'profile.npz'
-    soma = json.loads((folder/'soma.json').read_text())
-    region = json.loads((folder/'region.json').read_text())
+    if soma is None:
+        soma = json.loads((folder/'soma.json').read_text())
+    if heldout:
+        soma = dict(soma, annotations=[cell for cell in soma['annotations'] if not any(
+            intersects(hold, dict(x=min(x for x, _ in cell['points_xy']),
+                                  y=min(y for _, y in cell['points_xy']),
+                                  width=np.ptp([x for x, _ in cell['points_xy']]),
+                                  height=np.ptp([y for _, y in cell['points_xy']])))
+            for hold in heldout)])
+    if review:
+        baseline = folder/review['source_run']
+        with zipfile.ZipFile(baseline/'dataset.zip') as archive:
+            region = json.loads(archive.read('region.json'))
+    else:
+        region = json.loads((folder/'region.json').read_text())
     for name, doc in (('soma', soma), ('region', region)):
         write_json(attempt/f'{name}.json', doc)
+    write_json(attempt/'heldout.json', heldout)
+    if review:
+        retained = {cell['id'] for cell in soma['annotations']}
+        additions = review['additions']
+        additions['drawn_details'] = [item for item in additions['drawn_details'] if item['id'] in retained]
+        additions['drawn'] = len(additions['drawn_details'])
+        additions['accepted'] = sum(cell.get('decision') == 'accepted' for cell in soma['annotations'])
+        write_json(attempt/'review.json', review)
     source = json.loads((folder/'source.json').read_text())
     report = fit_profile(image, soma, region, crops, profile,
                          intensity_noise=source.get('intensity_noise'), grow_somas=grow_somas)
-    metadata = dict(calibration=report, seed=seed, source=source)
+    metadata = dict(calibration=report, seed=seed, source=source, heldout_crops=len(heldout),
+                    refinement=review and dict(source_run=review['source_run'], model=review['model'],
+                                               additions=review['additions']))
+    if review:
+        parent = json.loads((baseline/'report.json').read_text())
+        if parent.get('manual_light'):
+            metadata['manual_light'] = parent['manual_light']
+            report.update(update_profile_light(arrays(profile), profile, parent['manual_light']['settings']))
 
     def scenes():
         for index in range(count):
@@ -99,7 +129,7 @@ def regenerate_light(folder, source_run, attempt, changes, update):
         if 'reference_background' not in profile:
             profile['reference_background'] = np.where(profile['neuron_support'], 0, image)
         config = update_profile_light(profile, attempt/'profile.npz', changes)
-        for name in ('soma.json', 'region.json'):
+        for name in ('soma.json', 'region.json', 'heldout.json', 'review.json'):
             if name in archive.namelist():
                 (attempt/name).write_bytes(archive.read(name))
         crops = json.loads(archive.read('centers.json'))
@@ -133,7 +163,7 @@ def finish_generation(image, attempt, crops, metadata, scenes, update):
     with zipfile.ZipFile(temporary, 'w') as archive:
         for name in ('profile.npz', 'report.json', 'centers.json', 'example.tiff'):
             archive.write(attempt/name, name)
-        for name in ('soma.json', 'region.json'):
+        for name in ('soma.json', 'region.json', 'heldout.json', 'review.json'):
             if (attempt/name).is_file():
                 archive.write(attempt/name, name)
         for row in reports:
@@ -227,6 +257,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.server.jobs[match[1]], OUTPUT/match[1], match[2]
         return None, None, ''
 
+    def review_route(self, folder, route):
+        match = re.fullmatch(r'(review-[0-9a-f]{32})/(.*)', route)
+        if match:
+            session = folder/match[1]
+            if session.is_dir():
+                return session, match[2]
+        return None, ''
+
     def light_route(self):
         route = self.route()
         if route in ('/light', '/light/data') and getattr(self.server, 'light_manifest', None):
@@ -248,6 +286,20 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.route() in ('/', '/app.js', '/style.css', '/light.js', '/light.css'):
             self.serve(WEB/('index.html' if self.route() == '/' else self.route()[1:]))
+            return
+        segmentation_assets = {'/segmentation': 'segmentation.html',
+                               '/segmentation.js': 'segmentation.js',
+                               '/segmentation.css': 'segmentation.css',
+                               '/segmentation.mjs': 'segmentation.mjs'}
+        if self.route() in segmentation_assets:
+            self.serve(WEB/segmentation_assets[self.route()])
+            return
+        if self.route() in ('/segmentation/candidates.json', '/segmentation/scene.png'):
+            source = getattr(self.server, 'segmentation_source', None)
+            if source is None:
+                self.send_error(404)
+            else:
+                self.serve(source/self.route().rsplit('/', 1)[1])
             return
         data, source = self.light_route()
         if source is not None:
@@ -273,7 +325,7 @@ class Handler(BaseHTTPRequestHandler):
             if filename in ('dataset.zip', 'report.json', 'example.tiff', 'soma.json') and (attempt/'dataset.zip').is_file():
                 self.serve(attempt/filename)
                 return
-            if filename in (*PREVIEW_NAMES, 'metrics.png') and (attempt/'dataset.zip').is_file():
+            if filename in (*PREVIEW_NAMES, 'metrics.png', 'heldout-metrics.png') and (attempt/'dataset.zip').is_file():
                 try:
                     lock = METRICS_LOCK if filename.endswith('metrics.png') else self.server.lock
                     with lock:
@@ -282,6 +334,8 @@ class Handler(BaseHTTPRequestHandler):
                                                     cached.stat().st_mtime < METRICS_MTIME):
                             if filename == 'metrics.png':
                                 write_metrics(folder, attempt)
+                            elif filename == 'heldout-metrics.png':
+                                write_heldout_metrics(folder, attempt)
                             else:
                                 restore_previews(folder, attempt)
                     self.serve(attempt/filename)
@@ -290,6 +344,33 @@ class Handler(BaseHTTPRequestHandler):
                 return
         job, folder, route = self.job_route()
         if job is not None:
+            if route == 'refinement':
+                with self.server.lock:
+                    state = job.get('refinement')
+                    if state is None:
+                        sessions = sorted(folder.glob('review-*/initial.json'),
+                                          key=lambda path: path.stat().st_mtime, reverse=True)
+                        if sessions:
+                            session = sessions[0].parent
+                            state = dict(stage='done', session=session.name,
+                                         training=(session/'training.log').is_file())
+                self.respond(state or {})
+                return
+            session, asset = self.review_route(folder, route)
+            if session is not None:
+                if asset == 'training.log':
+                    self.serve(session/asset)
+                elif asset == 'api/annotations':
+                    self.serve(session/'annotations.json')
+                elif (session/'initial.json').exists():
+                    asset = asset or 'index.html'
+                    if asset in ASSETS['soma']:
+                        self.serve(folder/'soma'/asset if asset.startswith('assets/') else annotate_somas.WEB/asset)
+                    else:
+                        self.send_error(404)
+                else:
+                    self.send_error(404)
+                return
             if route == 'status':
                 with self.server.lock:
                     state = job.copy()
@@ -303,6 +384,9 @@ class Handler(BaseHTTPRequestHandler):
                     attempt = folder/job['attempt']
                     reviewed = json.loads((attempt/'centers.json').read_text())
                     report = json.loads((attempt/'report.json').read_text())
+                    heldout = attempt/'heldout.json'
+                    if heldout.exists():
+                        reviewed += [dict(crop, holdout=True) for crop in json.loads(heldout.read_text())]
                     self.respond(dict(reviewed=reviewed, count=len(report['scenes']), seed=report['seed'],
                                       grow_somas=report['calibration'].get('grow_somas', False)))
                 else:
@@ -362,6 +446,40 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error(404)
                 return
             with self.server.lock:
+                if route in ('train-review', 'import-review'):
+                    has_run = job['stage'] == 'done' or (
+                        job['stage'] == 'fit_error' and job.get('previous_attempt'))
+                    if not has_run or job.get('refinement', {}).get('stage') == 'working':
+                        self.respond(dict(error='Нужен завершённый прогон. Дождитесь текущей операции.'), 409)
+                        return
+                    run = folder/(job['previous_attempt'] if job['stage'] == 'fit_error' else job['attempt'])
+                    predictions = None
+                    if route == 'import-review':
+                        predictions = Path(data['path']).expanduser().resolve(strict=True)
+                        if not predictions.is_file() or predictions.suffix.lower() != '.npz':
+                            raise ValueError('Укажите путь к NPZ с предсказаниями.')
+                    self.start_review(job, folder, run, predictions)
+                    self.respond(dict(started=True), 202)
+                    return
+                session, asset = self.review_route(folder, route)
+                if session is not None and asset == 'api/annotations':
+                    initial = json.loads((session/'initial.json').read_text())
+                    meta = json.loads((folder/'soma/assets/dataset.json').read_text())
+                    annotate_somas.validate(data, meta)
+                    reviewed = data['reviewed_crops']
+                    crop_ids = {crop['id'] for crop in data['crops']}
+                    if not isinstance(reviewed, list) or any(
+                            not isinstance(item, str) or item not in crop_ids for item in reviewed):
+                        raise ValueError('Неверный список просмотренных кропов.')
+                    decisions = {'pending', 'accepted', 'no_soma', 'bad_mask', 'uncertain'}
+                    if any(cell.get('decision', 'accepted') not in decisions for cell in data['annotations']):
+                        raise ValueError('Неверное решение о контуре.')
+                    if data.get('model') != initial['model'] or data.get('source_run') != initial['source_run']:
+                        raise ValueError('Разметка относится к другой сессии.')
+                    path = session/'annotations.json'
+                    write_json(path, data)
+                    self.respond(dict(saved=True, path=str(path)))
+                    return
                 if route == 'draft':
                     meta = json.loads((folder/'soma/assets/dataset.json').read_text())
                     validate_crops(data['crops'], meta['shape_yx'])
@@ -373,7 +491,8 @@ class Handler(BaseHTTPRequestHandler):
                         write_json(path, data)
                     self.respond(dict(saved=True))
                     return
-                if job['stage'] not in ('ready', 'done', 'fit_error'):
+                if (job['stage'] not in ('ready', 'done', 'fit_error') or
+                        job.get('refinement', {}).get('stage') == 'working'):
                     self.respond(dict(error='Дождитесь завершения текущей операции.'), 409)
                     return
                 if route in ('soma/api/annotations', 'region/api/annotations'):
@@ -385,10 +504,26 @@ class Handler(BaseHTTPRequestHandler):
                     write_json(target, data)
                     self.respond(dict(saved=True, path=str(target)))
                     return
-                if route == 'generate':
-                    crops, count, seed = data['crops'], data['count'], data['seed']
+                if route == 'generate' or (session is not None and asset == 'refit'):
+                    soma = review = None
                     meta = json.loads((folder/'soma/assets/dataset.json').read_text())
-                    grow_somas = data.get('grow_somas', False)
+                    if route == 'generate':
+                        crops, count, seed = data['crops'], data['count'], data['seed']
+                        grow_somas = data.get('grow_somas', False)
+                        heldout = data.get('heldout', [])
+                        if heldout:
+                            validate_crops(heldout, meta['shape_yx'])
+                            if any(intersects(crop, hold) for crop in crops for hold in heldout):
+                                raise ValueError('Кропы калибровки и оценки пересекаются.')
+                    else:
+                        initial = json.loads((session/'initial.json').read_text())
+                        review = json.loads((session/'annotations.json').read_text())
+                        reference = tifffile.imread(folder/'reference.tiff')
+                        with np.load(folder/initial['source_run']/'profile.npz') as profile:
+                            grow_somas = json.loads(str(profile['median_config'])).get('grow_somas', False)
+                            soma, crops, review['additions'] = refinement_input(
+                                review, initial, reference, profile['neuron_support'])
+                        count, seed, heldout = (initial[key] for key in ('count', 'seed', 'heldout'))
                     if type(grow_somas) is not bool:
                         raise ValueError('Режим роста должен быть логическим значением.')
                     if type(count) is not int or not 1 <= count <= 256:
@@ -396,8 +531,11 @@ class Handler(BaseHTTPRequestHandler):
                     if type(seed) is not int or not 0 <= seed < 2**32:
                         raise ValueError('Seed должен быть целым числом от 0 до 4294967295.')
                     validate_crops(crops, meta['shape_yx'])
+                    if len(crops)+len(heldout) > 30:
+                        raise ValueError('Используйте не больше 30 кропов суммарно.')
                     self.start_generation(job, folder, count, lambda attempt, update: generation(
-                        folder, attempt, crops, count, seed, update, grow_somas=grow_somas))
+                        folder, attempt, crops, count, seed, update, soma=soma, review=review,
+                        heldout=heldout, grow_somas=grow_somas))
                     self.respond(dict(started=True), 202)
                     return
             self.send_error(404)
@@ -416,7 +554,8 @@ class Handler(BaseHTTPRequestHandler):
         report = json.loads((source_run/'report.json').read_text())
         with self.server.lock:
             job = self.server.jobs[folder.name]
-            if job['stage'] not in ('done', 'fit_error'):
+            if (job['stage'] not in ('done', 'fit_error') or
+                    job.get('refinement', {}).get('stage') == 'working'):
                 self.respond(dict(error='Дождитесь завершения текущей операции.'), 409)
                 return
             self.start_generation(job, folder, len(report['scenes']), lambda attempt, update:
@@ -435,6 +574,43 @@ class Handler(BaseHTTPRequestHandler):
             with self.server.lock:
                 job['completed'] = completed
         self.background(job, 'done', lambda: run(attempt, update))
+
+    def start_review(self, job, folder, run, predictions):
+        session = folder/f'review-{uuid.uuid4().hex}'
+        session.mkdir()
+        state = dict(stage='working', session=session.name, message='Готовим предложения…',
+                     training=predictions is None)
+        completed = max(folder.glob('review-*/initial.json'), key=lambda path: path.stat().st_mtime, default=None)
+        state['previous'] = completed.parent.name if completed else None
+        job['refinement'] = state
+
+        def update(message):
+            with self.server.lock:
+                state['message'] = message
+
+        def work():
+            try:
+                source = predictions
+                if source is not None:
+                    imported = session/'prediction'
+                    imported.mkdir()
+                    shutil.copyfile(source.with_name('report.json'), imported/'report.json')
+                    shutil.copyfile(source, imported/'instances.npz')
+                    source = imported/'instances.npz'
+                else:
+                    update('Ожидаем очередь обучения…')
+                    with TRAINING_LOCK:
+                        source = train_and_predict(folder, run, session, update)
+                update('Подготавливаем кропы и контуры…')
+                doc = prepare_review(folder, run, source)
+                write_json(session/'annotations.json', doc)
+                write_json(session/'initial.json', doc)
+                with self.server.lock:
+                    state.update(stage='done')
+            except Exception as error:
+                with self.server.lock:
+                    state.update(stage='error', message=str(error))
+        threading.Thread(target=work, daemon=True).start()
 
     def upload(self, length):
         name = Path(unquote(self.headers.get('X-Filename', ''))).name
@@ -489,12 +665,16 @@ def main():
     parser.add_argument('--port', type=int, default=8767)
     parser.add_argument('--open', action='store_true')
     parser.add_argument('--light-source', type=Path, help='Local preview manifest at /light')
+    parser.add_argument('--segmentation-source', type=Path,
+                        help='Local browser preview bundle at /segmentation')
     args = parser.parse_args()
     with ThreadingHTTPServer(('127.0.0.1', args.port), Handler) as server:
         server.lock = threading.Lock()
         server.jobs = saved_projects()
         server.light_manifest = args.light_source.resolve(strict=True) if args.light_source else None
-        page = '/light' if server.light_manifest else ''
+        server.segmentation_source = (args.segmentation_source.resolve(strict=True)
+                                      if args.segmentation_source else ROOT/'outputs/segmentation-preview')
+        page = '/segmentation' if args.segmentation_source else '/light' if server.light_manifest else ''
         url = f'http://127.0.0.1:{server.server_port}{page}'
         print(url, flush=True)
         if args.open:

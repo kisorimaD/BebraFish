@@ -270,3 +270,68 @@ def write_metrics(folder, attempt):
     return dict(image_real=image_real, images=images, real_nn=real_nn, nn_radii=nn_radii,
                 synthetic_nn=synthetic_nn, real_contrast=real_contrast, real_arcs=real_arcs,
                 real_pairs=real_pairs, pair_counts=pair_counts, shells=shells)
+
+
+def write_heldout_metrics(folder, attempt):
+    """Compare matched seeds on evaluation crops fixed by the source run."""
+    heldout = json.loads((attempt/'heldout.json').read_text())
+    if not heldout:
+        raise ValueError('В исходном прогоне нет контрольных кропов.')
+    report = json.loads((attempt/'report.json').read_text())
+    baseline = folder/report['refinement']['source_run']
+    before = json.loads((baseline/'report.json').read_text())
+    reference = tifffile.imread(folder/'reference.tiff')
+    with np.load(baseline/'profile.npz') as profile:
+        support = profile['neuron_support'].copy()
+    heldout_mask = np.zeros(reference.shape, bool)
+    for crop in heldout:
+        x, y, w, h = (crop[key] for key in ('x', 'y', 'width', 'height'))
+        heldout_mask[y:y+h, x:x+w] = True
+    support &= heldout_mask
+    windows = tissue_windows(support)
+    radii = np.arange(1, 21)
+    points = [np.asarray(crop['points'], float).reshape(-1, 2)[:, ::-1] for crop in heldout]
+    contrast, corr, _ = image_statistics(reference, support, windows, [])
+    real_nn = nearest_curve(points, heldout, radii)
+    seeds = {row['seed']: row['path'] for row in before['scenes']}
+    matched = [row for row in report['scenes'] if row['seed'] in seeds]
+    selected = np.linspace(0, len(matched)-1, min(16, len(matched))).round().astype(int)
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4.5), layout='constrained')
+    try:
+        fig.suptitle(f'Контрольные кропы · {len(heldout)} кропов · '
+                     f'{sum(map(len, points))} отмеченных центров · {len(selected)} пар сцен')
+        ecdf(axes[0], contrast, REAL, 'Рабочая медиана')
+        axes[1].plot(PIXEL_LAGS, corr, 'o-', color=REAL, label='Рабочая медиана')
+        axes[2].plot(radii, real_nn, color=REAL, label='Рабочая медиана')
+        for run, color, name, paths in (
+                (baseline, BASE, 'До доразметки', [seeds[matched[i]['seed']] for i in selected]),
+                (attempt, SYNTH, 'После доразметки', [matched[i]['path'] for i in selected])):
+            contrasts, correlations, neighbors = [], [], []
+            with zipfile.ZipFile(run/'dataset.zip') as archive:
+                for path in paths:
+                    with np.load(io.BytesIO(archive.read(path))) as scene:
+                        values, correlation, _ = image_statistics(scene['image_structured'], support, windows, [])
+                        contrasts.extend(values)
+                        correlations.append(correlation)
+                        neighbors.append(nearest_curve([scene['centers']]*len(heldout), heldout, radii))
+            ecdf(axes[0], contrasts, color, name)
+            for ax, x, values in ((axes[1], PIXEL_LAGS, correlations), (axes[2], radii, neighbors)):
+                lines = np.asarray(values)
+                if lines.size:
+                    valid = np.isfinite(lines).any(axis=0)
+                    if valid.any():
+                        q = np.nanpercentile(lines[:, valid], [25, 50, 75], axis=0)
+                        ax.plot(x[valid], q[1], color=color, label=name)
+                        ax.fill_between(x[valid], q[0], q[2], color=color, alpha=.16)
+        axes[0].set(title=f'Локальный контраст · {len(windows)} окон', xlabel='P95–P5, ADU',
+                    ylabel='Доля окон ≤ x')
+        axes[1].set(title='Автокорреляция ткани', xlabel='Сдвиг, px', ylabel='Корреляция')
+        axes[2].set(title='Ближайший сосед', xlabel='Радиус, px', ylabel='Доля центров')
+        for ax in axes:
+            if ax.get_legend_handles_labels()[0]:
+                ax.legend(fontsize=8)
+        temp = attempt/'heldout-metrics.tmp'
+        fig.savefig(temp, format='png', dpi=130)
+        temp.replace(attempt/'heldout-metrics.png')
+    finally:
+        plt.close(fig)

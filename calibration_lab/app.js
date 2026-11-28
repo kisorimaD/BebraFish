@@ -2,7 +2,7 @@ const byId = id => document.getElementById(id);
 const steps = [...document.querySelectorAll('[data-step]')];
 const canvas = byId('image');
 const context = canvas.getContext('2d');
-let base, image, crops, previewBase, activeStep;
+let base, image, crops, previewBase, activeStep, reviewPoll;
 let saveQueue = Promise.resolve();
 
 async function request(path, body) {
@@ -27,7 +27,8 @@ function showStep(active) {
     button.setAttribute('aria-current', step === active ? 'step' : 'false');
   }
   const frame = byId(active).querySelector('iframe');
-  if (frame && !frame.hasAttribute('src')) frame.src = base + active + '/';
+  if (active === 'refinement') refreshReview();
+  if (frame && active !== 'refinement' && !frame.hasAttribute('src')) frame.src = base + active + '/';
   if (active === 'centers') drawCrop();
 }
 
@@ -103,6 +104,7 @@ function initialCrops(reference, soma) {
 
 async function openProject(token, requestedStep) {
   busy(true);
+  clearTimeout(reviewPoll);
   byId('baseline-links').hidden = true;
   byId('workflow').hidden = byId('result').hidden = byId('comparison').hidden = byId('metrics').hidden = true;
   status('Открываем проект…');
@@ -196,12 +198,17 @@ function drawCrop() {
     context.arc((x-crop.x+.5)*scale, (y-crop.y+.5)*scale, 5, 0, 2*Math.PI);
     context.stroke();
   }
+  byId('holdout').checked = Boolean(crop.holdout);
   byId('reviewed').checked = crop.reviewed;
   byId('marked').textContent = 'Центров в кропе: ' + crop.points.length +
     ' · Просмотрено кропов: ' + crops.filter(item => item.reviewed).length;
 }
 
 byId('crop').onchange = () => { drawCrop(); saveDraft(); };
+byId('holdout').onchange = event => {
+  selectedCrop().holdout = event.currentTarget.checked;
+  saveDraft();
+};
 byId('reviewed').onchange = event => {
   selectedCrop().reviewed = event.currentTarget.checked;
   drawCrop();
@@ -253,7 +260,22 @@ function showResult(state) {
     if (project !== base || previewBase !== project + state.attempt + '/') return;
     const links = byId('baseline-links');
     links.replaceChildren();
-    if (report.manual_light) {
+    if (report.refinement) {
+      const original = base + report.refinement.source_run + '/';
+      const files = [['Скачать итоговые контуры', previewBase + 'soma.json'],
+                     ['Графики исходного прогона', original + 'metrics.png'],
+                     ['Исходный датасет', original + 'dataset.zip']];
+      if (report.heldout_crops) files.unshift(['Сравнение на контрольных кропах', previewBase + 'heldout-metrics.png']);
+      for (const [label, url] of files) {
+        if (links.childNodes.length) links.append(' · ');
+        const link = document.createElement('a');
+        link.href = url;
+        if (url.endsWith('/soma.json')) link.download = 'soma.json';
+        link.textContent = label;
+        links.append(link);
+      }
+    }
+    if (report.manual_light && report.manual_light.source_run !== report.refinement?.source_run) {
       const link = document.createElement('a');
       link.href = base + report.manual_light.source_run + '/dataset.zip';
       link.textContent = 'Датасет до ручной настройки';
@@ -286,7 +308,8 @@ byId('run').onsubmit = async event => {
   try {
     saveDraft();
     await request(base + 'generate', {
-      crops: crops.filter(crop => crop.reviewed),
+      crops: crops.filter(crop => crop.reviewed && !crop.holdout),
+      heldout: crops.filter(crop => crop.holdout && crop.reviewed),
       count: Number(byId('count').value),
       seed: Number(byId('seed').value),
       grow_somas: byId('grow-somas').checked
@@ -300,6 +323,61 @@ byId('run').onsubmit = async event => {
     busy(false);
   }
 };
+
+async function refreshReview() {
+  clearTimeout(reviewPoll);
+  const project = base;
+  try {
+    const [job, state] = await Promise.all([request(project + 'status'), request(project + 'refinement')]);
+    if (base !== project) return;
+    const working = state.stage === 'working';
+    const hasRun = job.stage === 'done' || (job.stage === 'fit_error' && job.previous_attempt);
+    const disabled = working || !hasRun;
+    byId('train-review').disabled = byId('import-review').querySelector('button').disabled = disabled;
+    byId('review-status').textContent = state.message && state.stage !== 'done' ? state.message
+      : !hasRun ? 'Сначала завершите генерацию.' : '';
+    const log = byId('training-log');
+    log.hidden = !state.training;
+    if (state.training) log.href = project + state.session + '/training.log';
+    const session = state.stage === 'done' ? state.session : state.previous;
+    const frame = byId('refinement').querySelector('iframe');
+    frame.hidden = byId('review-help').hidden = !session;
+    if (session && frame.getAttribute('src') !== project + session + '/') frame.src = project + session + '/';
+    if (working) reviewPoll = setTimeout(refreshReview, 1200);
+  } catch (error) {
+    if (base === project) byId('review-status').textContent = error.message;
+  }
+}
+
+async function startReview(route, body) {
+  const project = base;
+  byId('train-review').disabled = byId('import-review').querySelector('button').disabled = true;
+  try {
+    await request(project + route, body);
+    if (base === project) await refreshReview();
+  } catch (error) {
+    if (base !== project) return;
+    await refreshReview();
+    if (base === project) byId('review-status').textContent = error.message;
+  }
+}
+
+byId('train-review').onclick = () => startReview('train-review', {});
+byId('import-review').onsubmit = event => {
+  event.preventDefault();
+  startReview('import-review', {path: byId('prediction-path').value});
+};
+window.addEventListener('message', async event => {
+  const frame = byId('refinement').querySelector('iframe');
+  if (event.origin !== location.origin || event.source !== frame.contentWindow ||
+      event.data?.type !== 'bebrafish-refit') return;
+  showStep('generate');
+  saveDraft();
+  busy(true);
+  try { await trackGeneration(); }
+  catch (error) { status(error.message, true); }
+  finally { busy(false); }
+});
 
 for (const id of ['count', 'seed', 'grow-somas']) byId(id).onchange = saveDraft;
 
